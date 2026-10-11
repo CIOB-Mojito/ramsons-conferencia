@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#070b14">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Meu perfil · RAMSONS</title>
+<link rel="stylesheet" href="rconf-ui.css">
+<style>
+  .p-perfil{display:flex;align-items:center;gap:13px;}
+  .p-perfil .pic{width:46px;height:46px;flex:0 0 46px;border-radius:50%;
+    background:linear-gradient(145deg,#1a2436,#0e1524);border:1px solid rgba(255,122,26,.4);
+    color:var(--accent-2);font-weight:800;font-size:18px;display:grid;place-items:center;text-transform:uppercase;}
+  .p-perfil .pbody{min-width:0;flex:1;}
+  .p-perfil .pname{font-size:16px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .p-perfil .prole{margin-top:4px;}
+  .tag{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:800;
+    letter-spacing:1.4px;text-transform:uppercase;padding:4px 10px;border-radius:99px;
+    border:1px solid rgba(255,122,26,.4);color:var(--accent-2);background:rgba(255,122,26,.1);}
+  .tag .dot{width:6px;height:6px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);}
+  .show-id{margin-top:8px;font-size:10.5px;color:#6f7c93;letter-spacing:.4px;}
+  .show-id b{color:var(--cyan);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:10.5px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .form{display:flex;flex-direction:column;gap:11px;margin-top:14px;}
+  .field{position:relative;display:block;}
+  .field > svg{position:absolute;left:15px;top:50%;transform:translateY(-50%);
+    width:18px;height:18px;color:var(--txt-dim);pointer-events:none;transition:color .2s;}
+  .field:focus-within > svg{color:var(--cyan);}
+  .field input{width:100%;height:50px;border-radius:14px;border:1px solid var(--panel-brd);
+    background:rgba(8,13,24,.7);color:var(--txt);font:inherit;font-size:15px;
+    padding:0 46px 0 46px;outline:none;transition:border-color .2s, box-shadow .2s;}
+  .field input::placeholder{color:#5f6c82;}
+  .field input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(55,214,196,.18);}
+  .field.bad input{border-color:var(--bad);box-shadow:0 0 0 3px rgba(255,92,108,.14);}
+  .err{min-height:18px;font-size:12.5px;color:var(--bad);text-align:center;letter-spacing:.2px;}
+  .ok-msg{min-height:18px;font-size:12.5px;color:var(--good);text-align:center;letter-spacing:.2px;}
+  .padlock{text-align:center;font-size:11px;color:#6f7c93;letter-spacing:.3px;}
+  .spin{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(26,13,2,.28);border-top-color:#1a0d02;animation:spin .7s linear infinite;}
+</style>
+</head>
+<body>
+
+<div class="glow" aria-hidden="true"></div>
+
+<div class="screen">
+  <header class="app-header">
+    <button type="button" class="back" id="back" aria-label="Voltar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+    <div class="mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#ff7a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+    </div>
+    <div class="brand"><h1>RAM<span>SONS</span></h1><h2>Meu perfil</h2></div>
+  </header>
+
+  <div class="content">
+    <div class="wrap">
+      <h3 class="screen-title"><span class="bar" aria-hidden="true"></span> Meu perfil</h3>
+
+      <div class="card">
+        <div class="p-perfil" id="perfilBox"></div>
+        <p class="show-id" id="showId">ID interno: <b>—</b></p>
+      </div>
+
+      <div class="card">
+        <p class="card-label"><span class="dot" aria-hidden="true"></span>Alterar meu PIN</p>
+        <form class="form" id="pinForm" novalidate>
+          <label class="field" id="fAtual">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+            <input id="atual" name="atual" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password" autocorrect="off" spellcheck="false" enterkeyhint="next" placeholder="PIN atual" aria-label="PIN atual">
+          </label>
+          <label class="field" id="fNovo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M8 11l2.5 2.5L16 7"/></svg>
+            <input id="novo" name="novo" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password" autocorrect="off" spellcheck="false" enterkeyhint="next" placeholder="Novo PIN (4 a 12 dígitos)" aria-label="Novo PIN">
+          </label>
+          <label class="field" id="fNovo2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><circle cx="9.5" cy="9" r="1"/><circle cx="14.5" cy="9" r="1"/></svg>
+            <input id="novo2" name="novo2" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password" autocorrect="off" spellcheck="false" enterkeyhint="done" placeholder="Confirmar novo PIN" aria-label="Confirmar novo PIN">
+          </label>
+          <p class="err" id="formErr" role="alert"></p>
+          <p class="ok-msg" id="formOk" role="status"></p>
+          <button type="submit" class="btn btn-primary" id="btnSave"><span id="saveLbl">Alterar PIN</span></button>
+          <p class="padlock">Seu PIN é armazenado com segurança e nunca é exibido.</p>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<div class="loader" id="loader">
+  <div class="l-wrap">
+    <div class="l-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#ff7a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+    </div>
+    <p>Ramsons</p>
+  </div>
+</div>
+
+<script src="rconf-store.js"></script>
+<script src="rconf-api.js"></script>
+<script>
+(function () {
+  "use strict";
+  var user = (typeof Rconf !== "undefined") ? Rconf.session.user() : null;
+  if (!user) { window.location.replace("index.html"); return; }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var loaderEl = $("loader"), toastEl = $("toast");
+  var perfilBox = $("perfilBox"), showId = $("showId");
+  var fAtual = $("fAtual"), fNovo = $("fNovo"), fNovo2 = $("fNovo2");
+  var atualEl = $("atual"), novoEl = $("novo"), novoEl2 = $("novo2");
+  var formErr = $("formErr"), formOk = $("formOk"), btnSave = $("btnSave"), saveLbl = $("saveLbl");
+  var busy = false;
+
+  function escapar(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function roleName(r) { return r === "ADM" ? "Administrador" : r === "USUARIO" ? "Usuário" : "—"; }
+
+  function renderPerfil(d) {
+    var u = d && d.user ? d.user : user;
+    var r = d && d.role ? d.role : null;
+    var ini = escapar(String(u || "?")).charAt(0).toUpperCase();
+    perfilBox.innerHTML =
+      '<div class="pic">' + ini + '</div>' +
+      '<div class="pbody">' +
+        '<div class="pname">' + escapar(u) + '</div>' +
+        '<div class="prole"><span class="tag"><span class="dot"></span>' + escapar(roleName(r)) + '</span></div>' +
+      '</div>';
+    showId.innerHTML = d && d.id ? 'ID interno: <b>' + escapar(d.id) + '</b>' : 'ID interno: <b>—</b>';
+  }
+  if (window.RconfApi) {
+    RconfApi.me().then(renderPerfil).catch(function () { renderPerfil(null); });
+  } else {
+    renderPerfil(null);
+  }
+
+  function okBadge(el, bad) { el.classList.toggle("bad", bad); }
+
+  ["atual", "novo", "novo2"].forEach(function (id) {
+    $(id).addEventListener("input", function () {
+      formErr.textContent = ""; formOk.textContent = "";
+      var v = $(id).value.replace(/[^0-9]/g, "");
+      if (v !== $(id).value) $(id).value = v;
+      okBadge($("f" + id[0].toUpperCase() + id.slice(1)), false);
+    });
+  });
+  document.addEventListener("DOMContentLoaded", function () {}, {});
+  try { atualEl.focus(); } catch (e) {}
+
+  $("pinForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (busy) return;
+    formErr.textContent = ""; formOk.textContent = "";
+    okBadge(fAtual, false); okBadge(fNovo, false); okBadge(fNovo2, false);
+
+    var atual = atualEl.value, novo = novoEl.value, novo2 = novoEl2.value;
+    if (!/^\d{4,12}$/.test(novo)) { okBadge(fNovo, true); formErr.textContent = "O novo PIN deve ter de 4 a 12 dígitos."; return; }
+    if (novo !== novo2) { okBadge(fNovo2, true); formErr.textContent = "Os novos PINs não conferem."; return; }
+
+    busy = true; btnSave.disabled = true; saveLbl.innerHTML = '<span class="spin" aria-hidden="true"></span>';
+    RconfApi.myPin(atual, novo, novo2).then(function () {
+      busy = false; btnSave.disabled = false; saveLbl.textContent = "Alterar PIN";
+      pinForm.reset();
+      formOk.textContent = "PIN alterado com sucesso.";
+    }).catch(function (err) {
+      busy = false; btnSave.disabled = false; saveLbl.textContent = "Alterar PIN";
+      var msg = (err && err.data && err.data.message) ? err.data.message : "Não foi possível alterar o PIN.";
+      if (msg.toLowerCase().indexOf("atual") !== -1) okBadge(fAtual, true);
+      formErr.textContent = msg;
+    });
+  });
+
+  $("back").addEventListener("click", function () { window.location.href = "opcoes.html"; });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".btn"), function (b) {
+    b.addEventListener("pointerdown", function (e) {
+      var rc = b.getBoundingClientRect(), s = document.createElement("span");
+      s.className = "ripple";
+      s.style.left = (e.clientX - rc.left) + "px"; s.style.top = (e.clientY - rc.top) + "px";
+      b.appendChild(s);
+      s.addEventListener("animationend", function () { s.remove(); });
+    });
+  });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+
+  loaderEl.classList.add("hide");
+  setTimeout(function () { loaderEl.style.display = "none"; }, 600);
+})();
+</script>
+</body>
+</html>

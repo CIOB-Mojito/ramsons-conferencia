@@ -1,0 +1,37 @@
+# Dependências
+node_modules/
+
+# Dados operacionais e privados (contas, sessões, conferências, histórico)
+data/
+data/**/.sessions.json
+data/**/accounts.json
+data/**/users.json
+data/**/historico.json
+data/**/conferencias.json
+data/**/conferenciaAtual.json
+data/**/.tombstones.json
+
+# Backups gerados pela aplicação
+*.bak-*
+
+# Logs e cache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+.cache/
+tmp/
+
+# Variáveis de ambiente / segredos
+.env
+.env.*
+*.pem
+*.key
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*~

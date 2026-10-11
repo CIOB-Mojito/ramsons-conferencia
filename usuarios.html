@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#070b14">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Usuários · RAMSONS</title>
+<link rel="stylesheet" href="rconf-ui.css">
+<style>
+  .u-count{margin-top:8px;font-size:13px;line-height:1.5;color:var(--txt-dim);}
+  .ulist{margin-top:14px;display:flex;flex-direction:column;gap:9px;}
+  .uitem{display:flex;align-items:center;gap:13px;padding:13px 14px;border-radius:15px;
+    background:var(--panel-2);border:1px solid var(--panel-brd);animation:fadeIn .3s both;cursor:pointer;}
+  .uitem:active{transform:scale(.985);}
+  .uitem .chev{flex:0 0 auto;width:18px;height:18px;color:var(--txt-dim);opacity:.7;}
+  .u-hint{margin-top:10px;font-size:11.5px;line-height:1.6;color:#6f7c93;}
+  .uitem .pic{width:40px;height:40px;flex:0 0 40px;border-radius:50%;
+    background:linear-gradient(145deg,#1a2436,#0e1524);border:1px solid rgba(255,122,26,.3);
+    color:var(--accent-2);font-weight:800;font-size:16px;display:grid;place-items:center;text-transform:uppercase;}
+  .uitem .ubody{min-width:0;flex:1;}
+  .uitem .uname{font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .uitem .urole{margin-top:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .uitem .badge{font-size:9px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;padding:3px 8px;border-radius:6px;color:var(--accent-2);border:1px solid rgba(255,122,26,.4);background:rgba(255,122,26,.1);}
+  .uitem .badge.adm{color:#ffd08a;border-color:rgba(255,161,74,.55);background:rgba(255,122,26,.16);}
+  .uitem .status{display:inline-flex;align-items:center;gap:5px;font-size:9.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--good);}
+  .uitem .status .dot{width:6px;height:6px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);}
+  .btn-new{margin-top:14px;}
+
+  /* ---------- formulário (mesmo padrão do login) ---------- */
+  .sheet .s-title{text-align:center;font-size:16px;font-weight:800;line-height:1.4;}
+  .form{display:flex;flex-direction:column;gap:11px;margin-top:14px;}
+  .field{position:relative;display:block;}
+  .field > svg{position:absolute;left:15px;top:50%;transform:translateY(-50%);
+    width:18px;height:18px;color:var(--txt-dim);pointer-events:none;transition:color .2s;}
+  .field:focus-within > svg{color:var(--cyan);}
+  .field input,.field select{width:100%;height:50px;border-radius:14px;border:1px solid var(--panel-brd);
+    background:rgba(8,13,24,.7);color:var(--txt);font:inherit;font-size:15px;
+    padding:0 46px 0 46px;outline:none;transition:border-color .2s, box-shadow .2s;}
+  .field select{-webkit-appearance:none;appearance:none;cursor:pointer;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238b97ad' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat:no-repeat;background-position:right 14px center;}
+  .field input::placeholder{color:#5f6c82;}
+  .field input:focus,.field select:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(55,214,196,.18);}
+  .field.bad input,.field.bad select{border-color:var(--bad);box-shadow:0 0 0 3px rgba(255,92,108,.14);}
+  .err{min-height:18px;font-size:12.5px;color:var(--bad);text-align:center;letter-spacing:.2px;}
+  .padlock{text-align:center;font-size:11px;color:#6f7c93;letter-spacing:.3px;}
+  .spin{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(26,13,2,.28);border-top-color:#1a0d02;animation:spin .7s linear infinite;}
+</style>
+</head>
+<body>
+
+<div class="glow" aria-hidden="true"></div>
+
+<div class="screen">
+  <header class="app-header">
+    <button type="button" class="back" id="back" aria-label="Voltar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+    <div class="mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#ff7a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+    </div>
+    <div class="brand"><h1>RAM<span>SONS</span></h1><h2>Usuários</h2></div>
+  </header>
+
+  <div class="content">
+    <div class="wrap">
+      <h3 class="screen-title"><span class="bar" aria-hidden="true"></span> Usuários</h3>
+      <p class="u-count" id="uCount">Carregando usuários…</p>
+      <p class="u-hint">Toque em um usuário para ver os detalhes e as ações administrativas.</p>
+
+      <button type="button" class="btn btn-primary btn-new" id="btnNew">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        + Criar usuário
+      </button>
+
+      <div class="ulist" id="uList"></div>
+      <div class="empty" id="uEmpty" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M17 11a4 4 0 1 0 0-8"/><path d="M1 21v-1a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v1"/></svg>
+        <p>Nenhum usuário registrado.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Formulário de criação -->
+<div class="overlay" id="formBox" aria-hidden="true">
+  <div class="scrim"></div>
+  <div class="sheet">
+    <div class="grab" aria-hidden="true"></div>
+    <p class="s-title">Criar usuário</p>
+    <form class="form" id="createForm" novalidate>
+      <label class="field" id="fNome">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg>
+        <input id="nome" name="nome" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" placeholder="Nome de usuário" aria-label="Nome de usuário">
+      </label>
+      <label class="field" id="fPin">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password" autocorrect="off" spellcheck="false" enterkeyhint="next" placeholder="PIN (4 a 12 dígitos)" aria-label="PIN">
+      </label>
+      <label class="field" id="fPin2">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M8 11l2.5 2.5L16 7"/></svg>
+        <input id="pin2" name="pin2" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="new-password" autocorrect="off" spellcheck="false" enterkeyhint="next" placeholder="PIN (confirmação)" aria-label="PIN de confirmação">
+      </label>
+      <label class="field" id="fTipo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg>
+        <select id="tipo" aria-label="Tipo de conta">
+          <option value="USUARIO">Usuário</option>
+          <option value="ADM">Administrador (ADM)</option>
+        </select>
+      </label>
+      <p class="err" id="formErr" role="alert"></p>
+      <div class="s-actions">
+        <button type="button" class="btn btn-ghost" id="btnCancel">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btnSave"><span id="saveLbl">Criar usuário</span></button>
+      </div>
+      <p class="padlock">O PIN é armazenado de forma segura e nunca é exibido.</p>
+    </form>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<div class="loader" id="loader">
+  <div class="l-wrap">
+    <div class="l-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#ff7a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+    </div>
+    <p>Ramsons</p>
+  </div>
+</div>
+
+<script src="rconf-store.js"></script>
+<script src="rconf-api.js"></script>
+<script>
+(function () {
+  "use strict";
+  var user = (typeof Rconf !== "undefined") ? Rconf.session.user() : null;
+  if (!user) { window.location.replace("index.html"); return; }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var loaderEl = $("loader"), toastEl = $("toast");
+  var uList = $("uList"), uEmpty = $("uEmpty"), uCount = $("uCount");
+  var formBox = $("formBox"), createForm = $("createForm");
+  var fNome = $("fNome"), fPin = $("fPin"), fPin2 = $("fPin2"), fTipo = $("fTipo");
+  var nomeEl = $("nome"), pinEl = $("pin"), pinEl2 = $("pin2"), tipoEl = $("tipo");
+  var formErr = $("formErr"), btnSave = $("btnSave"), saveLbl = $("saveLbl");
+  var busy = false, lista = [];
+
+  function escapar(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function roleName(r) { return r === "ADM" ? "Admin" : "Usuário"; }
+
+  var toastTimer;
+  function showToast(msg, ok) {
+    toastEl.textContent = msg;
+    toastEl.classList.toggle("ok", !!ok);
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 2400);
+  }
+
+  function render(lista2) {
+    uList.innerHTML = "";
+    if (!lista2.length) { uEmpty.hidden = false; uCount.textContent = "Nenhum usuário registrado."; return; }
+    uEmpty.hidden = true;
+    uCount.textContent = lista2.length + (lista2.length === 1 ? " usuário registrado" : " usuários registrados");
+    var frag = document.createDocumentFragment();
+    lista2.forEach(function (c) {
+      var el = document.createElement("div");
+      el.className = "uitem";
+      el.innerHTML =
+        '<div class="pic">' + escapar(c.user.charAt(0).toUpperCase()) + '</div>' +
+        '<div class="ubody">' +
+          '<div class="uname">' + escapar(c.user) + '</div>' +
+          '<div class="urole"><span class="badge ' + (c.role === "ADM" ? "adm" : "") + '">' + escapar(roleName(c.role)) + '</span>' +
+          '<span class="status"><span class="dot"></span>Ativo</span></div>' +
+        '</div>' +
+        '<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>';
+      el.addEventListener("click", function () {
+        window.location.href = "usuario.html?id=" + encodeURIComponent(c.id);
+      });
+      frag.appendChild(el);
+    });
+    uList.appendChild(frag);
+  }
+
+  function loadList() {
+    if (window.RconfApi) {
+      RconfApi.adminUsers().then(function (d) {
+        lista = (d && d.usuarios && d.usuarios.map) ? d.usuarios : [];
+        render(lista);
+      }).catch(function () {
+        uCount.textContent = "Não foi possível carregar.";
+      });
+    }
+  }
+
+  /* guarda ADM também no cliente; o servidor valida de novo em cada chamada */
+  RconfApi.me().then(function (d) {
+    if (!d || d.role !== "ADM") { window.location.replace("opcoes.html"); return; }
+    loadList();
+  }).catch(function () { window.location.replace("opcoes.html"); });
+
+  /* ---------- abrir/fechar formulário ---------- */
+  function resetForm() {
+    createForm.reset();
+    fNome.classList.remove("bad"); fPin.classList.remove("bad"); fPin2.classList.remove("bad"); fTipo.classList.remove("bad");
+    formErr.textContent = "";
+  }
+  function openForm() { resetForm(); formBox.classList.add("show"); formBox.setAttribute("aria-hidden", "false"); }
+  function closeForm() { formBox.classList.remove("show"); formBox.setAttribute("aria-hidden", "true"); }
+  $("btnNew").addEventListener("click", openForm);
+  $("btnCancel").addEventListener("click", closeForm);
+  formBox.addEventListener("click", function (e) { if (e.target === formBox || e.target.classList.contains("scrim")) closeForm(); });
+
+  nomeEl.addEventListener("input", function () { formErr.textContent = ""; fNome.classList.remove("bad"); });
+  pinEl.addEventListener("input", function () {
+    formErr.textContent = ""; fPin.classList.remove("bad");
+    var v = pinEl.value.replace(/[^0-9]/g, "");
+    if (v !== pinEl.value) pinEl.value = v;
+  });
+  pinEl2.addEventListener("input", function () {
+    formErr.textContent = ""; fPin2.classList.remove("bad");
+    var v = pinEl2.value.replace(/[^0-9]/g, "");
+    if (v !== pinEl2.value) pinEl2.value = v;
+  });
+
+  function setBadge(f, bad) { f.classList.toggle("bad", bad); }
+
+  function validate() {
+    var ok = true;
+    var nome = nomeEl.value.trim();
+    var pin = pinEl.value, pin2 = pinEl2.value;
+    formErr.textContent = "";
+    setBadge(fNome, false); setBadge(fPin, false); setBadge(fPin2, false); setBadge(fTipo, false);
+    if (nome.length < 3 || nome.length > 24 || !/^[\p{L}\p{N}][\p{L}\p{N} ._'-]*$/u.test(nome)) { setBadge(fNome, true); formErr.textContent = "Nome inválido (3 a 24 caracteres)."; return false; }
+    if (!/^\d{4,12}$/.test(pin)) { setBadge(fPin, true); formErr.textContent = "Informe um PIN de 4 a 12 dígitos."; return false; }
+    if (pin !== pin2) { setBadge(fPin2, true); formErr.textContent = "Os PINs não conferem."; return false; }
+    return true;
+  }
+
+  createForm.addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (busy) return;
+    if (!validate()) return;
+    busy = true;
+    btnSave.disabled = true;
+    saveLbl.innerHTML = '<span class="spin" aria-hidden="true"></span>';
+    RconfApi.adminCreateUser(nomeEl.value.trim(), pinEl.value, pinEl2.value, tipoEl.value).then(function (d) {
+      busy = false; btnSave.disabled = false; saveLbl.textContent = "Criar usuário";
+      closeForm();
+      showToast("Usuário criado com sucesso", true);
+      loadList();
+    }).catch(function (err) {
+      busy = false; btnSave.disabled = false; saveLbl.textContent = "Criar usuário";
+      var msg = (err && err.data && err.data.message) ? err.data.message : "Não foi possível criar o usuário.";
+      formErr.textContent = msg;
+    });
+  });
+
+  $("back").addEventListener("click", function () { window.location.href = "opcoes.html"; });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".btn"), function (b) {
+    b.addEventListener("pointerdown", function (e) {
+      var rc = b.getBoundingClientRect(), s = document.createElement("span");
+      s.className = "ripple";
+      s.style.left = (e.clientX - rc.left) + "px"; s.style.top = (e.clientY - rc.top) + "px";
+      b.appendChild(s);
+      s.addEventListener("animationend", function () { s.remove(); });
+    });
+  });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+
+  loaderEl.classList.add("hide");
+  setTimeout(function () { loaderEl.style.display = "none"; }, 600);
+})();
+</script>
+</body>
+</html>

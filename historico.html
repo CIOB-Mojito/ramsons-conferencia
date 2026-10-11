@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#070b14">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Histórico · RAMSONS</title>
+<link rel="stylesheet" href="rconf-ui.css">
+</head>
+<body>
+
+<div class="glow" aria-hidden="true"></div>
+
+<div class="screen">
+  <header class="app-header">
+    <button type="button" class="back" id="back" aria-label="Voltar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+    <div class="mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#ff7a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+    </div>
+    <div class="brand"><h1>RAM<span>SONS</span></h1><h2>Histórico</h2></div>
+  </header>
+
+  <div class="content">
+    <div class="wrap">
+      <h3 class="screen-title"><span class="bar" aria-hidden="true"></span> Histórico</h3>
+      <p class="intro" id="histIntro">Suas conferências — em andamento e finalizadas — ficam salvas aqui.</p>
+
+      <div id="histList"></div>
+      <div class="empty" id="histEmpty" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l3 2"/></svg>
+        <p>Nenhuma conferência ainda.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<div class="loader" id="loader">
+  <div class="l-mark">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#ff7a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+  </div>
+  <p>Ramsons</p>
+</div>
+
+<script src="rconf-store.js"></script>
+<script src="rconf-flow.js"></script>
+<script src="rconf-api.js"></script>
+<script>
+(function () {
+  "use strict";
+  var user = (typeof Rconf !== "undefined") ? Rconf.session.user() : null;
+  if (!user) { window.location.replace("index.html"); return; }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var loaderEl = $("loader");
+  var toastEl = $("toast");
+
+  function escapar(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  var toastTimer;
+  function showToast(msg, ok){
+    if(!toastEl)return;
+    toastEl.textContent=msg;
+    toastEl.classList.toggle("ok",!!ok);
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer=setTimeout(function(){toastEl.classList.remove("show");},2400);
+  }
+  var LP_MS = 600;
+  var lpTimer = null, lpStart = null, suppressClick = false;
+
+  function cancelLongPress() { clearTimeout(lpTimer); lpTimer = null; lpStart = null; }
+
+  /* mantido pressionado -> confirma e remove SÓ aquela conferência (pelo id) */
+  function pedirRemocao(item) {
+    var id = item.getAttribute("data-id");
+    var tipo = item.getAttribute("data-tipo");
+    if (!id) return;
+    var nome = item.getAttribute("data-arquivo") || "conferência";
+    var detalhe = tipo === "aberta"
+      ? "\n\nEsta conferência está EM ANDAMENTO e será descartada."
+      : "\n\nEsta ação não pode ser desfeita.";
+    if (!window.confirm('Remover a conferência "' + nome + '"?\nID: ' + id + detalhe)) return;
+    remover(id, tipo);
+  }
+
+  function remover(id, tipo) {
+    var fn = window.RconfApi ? (tipo === "aberta" ? RconfApi.confDelete : RconfApi.histDelete) : null;
+    if (fn) {
+      fn(id).then(function () {
+        showToast("Conferência removida", true);
+        reload();
+      }).catch(function (err) {
+        if (err && err.status === 404) { showToast("Esta conferência já não existe", true); reload(); return; }
+        showToast("Não foi possível remover a conferência", false);
+      });
+      return;
+    }
+    var ok = false;   // modo local (sem servidor)
+    try {
+      if (tipo === "aberta") ok = !!(Rconf.confs && Rconf.confs.remove && Rconf.confs.remove(user, id));
+      else ok = !!(Rconf.historial && Rconf.historial.remove && Rconf.historial.remove(user, id));
+    } catch (e) { ok = false; }
+    showToast(ok ? "Conferência removida" : "Esta conferência já não existe", true);
+    reload();
+  }
+
+  function barraEstado(aberta) {
+    return aberta
+      ? '<span class="badge" style="color:#ffa14a;border-color:rgba(255,122,26,.5);">Em andamento</span>'
+      : '<span class="badge conf">Finalizada</span>';
+  }
+
+  function render(abertas, finalizadas) {
+    var box = $("histList");
+    var itens = [];
+    var i;
+    for (i = 0; i < (abertas || []).length; i++) itens.push({ conf: abertas[i], aberta: true });
+    for (i = 0; i < (finalizadas || []).length; i++) itens.push({ conf: finalizadas[i], aberta: false });
+    itens.sort(function (a, b) {   // mais recente primeiro
+      var ka = a.conf.finalizadaEm || a.conf.atualizadaEm || a.conf.criadaEm || 0;
+      var kb = b.conf.finalizadaEm || b.conf.atualizadaEm || b.conf.criadaEm || 0;
+      return kb - ka;
+    });
+    box.innerHTML = "";
+    if (!itens.length) {
+      $("histEmpty").hidden = false;
+      return;
+    }
+    $("histEmpty").hidden = true;
+    var frag = document.createDocumentFragment();
+    for (i = 0; i < itens.length; i++) {
+      var ent = itens[i], conf = ent.conf;
+      var aberta = ent.aberta;
+      var pr = RconfFlow.progress((conf && conf.produtos) || []);
+      var meta = aberta
+        ? '<div class="hmeta">' + RconfFlow.dataCurta(conf.atualizadaEm || conf.criadaEm) + ' · ' + RconfFlow.formatInt(pr.conferidos) + '/' + RconfFlow.formatInt(pr.total) + ' conferidos</div>'
+        : '<div class="hmeta">' + RconfFlow.dataCurta(conf.finalizadaEm || conf.atualizadaEm) + ' · finalizada</div>';
+      var res;
+      if (aberta) {
+        res = '<div class="hres"><div class="n">' + pr.pct + '%</div><div class="l">' + pr.faltando + ' faltam</div></div>';
+      } else {
+        var r = RconfFlow.resumo(conf);
+        var div = r.divergencias.length;
+        res = '<div class="hres ' + (div ? "diff" : "clean") + '"><div class="n">' + div + '</div><div class="l">' + (div ? "diverg." : "sem diverg.") + '</div></div>';
+      }
+      var el = document.createElement("div");
+      el.className = "hitem";
+      el.setAttribute("data-id", conf.id);
+      el.setAttribute("data-tipo", aberta ? "aberta" : "finalizada");
+      el.setAttribute("data-arquivo", conf.arquivo || "conferência");
+      el.innerHTML =
+        '<div class="hic">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>' +
+        '</div>' +
+        '<div class="hbody">' +
+          '<div style="margin-bottom:5px;">' + barraEstado(aberta) + '</div>' +
+          '<div class="hfile">' + escapar(conf.arquivo || "conferência") + '</div>' +
+          meta +
+        '</div>' +
+        res;
+      frag.appendChild(el);
+    }
+    box.appendChild(frag);
+  }
+
+  function reload(){
+    if(window.RconfApi){
+      var openP=RconfApi.confList()||Promise.resolve({conferencias:[]});
+      var doneP=RconfApi.histList()||Promise.resolve({historico:[]});
+      Promise.all([openP,doneP]).then(function(r){render((r[0]&&r[0].conferencias)||[],(r[1]&&r[1].historico)||[]);}).catch(function(){render(Rconf.confs?Rconf.confs.list(user):[],Rconf.historial?Rconf.historial.list(user):[]);});
+    }else{render(Rconf.confs?Rconf.confs.list(user):[],Rconf.historial?Rconf.historial.list(user):[]);}
+  }
+
+  var histList = $("histList");
+
+  histList.addEventListener("pointerdown", function (e) {
+    if (e.button != null && e.button !== 0) return;
+    var item = e.target.closest ? e.target.closest(".hitem") : null;
+    if (!item) return;
+    cancelLongPress();
+    lpStart = { x: e.clientX, y: e.clientY };
+    lpTimer = setTimeout(function () {
+      lpTimer = null;
+      suppressClick = true;                 // o toque longo NÃO deve abrir a conferência
+      if (navigator.vibrate) { try { navigator.vibrate(15); } catch (_) {} }
+      pedirRemocao(item);
+    }, LP_MS);
+  });
+
+  histList.addEventListener("pointermove", function (e) {
+    if (!lpTimer || !lpStart) return;
+    if (Math.abs(e.clientX - lpStart.x) > 10 || Math.abs(e.clientY - lpStart.y) > 10) cancelLongPress();
+  });
+  ["pointerup", "pointercancel", "pointerleave"].forEach(function (ev) {
+    histList.addEventListener(ev, cancelLongPress);
+  });
+
+  $("histList").addEventListener("click", function (e) {
+    if (suppressClick) { suppressClick = false; return; }   // ignora o clique que fecha o long-press
+    var item = e.target.closest ? e.target.closest(".hitem") : null;
+    if (!item) return;
+    var tipo = item.getAttribute("data-tipo") === "aberta" ? "conferencia.html" : "resumo.html";
+    window.location.href = tipo + "?id=" + encodeURIComponent(item.getAttribute("data-id"));
+  });
+
+  $("back").addEventListener("click", function () { window.location.href = "home.html"; });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".btn"), function (b) {
+    b.addEventListener("pointerdown", function (e) {
+      var rc = b.getBoundingClientRect(), s = document.createElement("span");
+      s.className = "ripple";
+      s.style.left = (e.clientX - rc.left) + "px"; s.style.top = (e.clientY - rc.top) + "px";
+      b.appendChild(s);
+      s.addEventListener("animationend", function () { s.remove(); });
+    });
+  });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+
+  if (window.RconfApi) {                          // servidor é a fonte principal
+    var openP = RconfApi.confList() || Promise.resolve({ conferencias: [] });
+    var doneP = RconfApi.histList() || Promise.resolve({ historico: [] });
+    Promise.all([openP, doneP]).then(function (r) {
+      render((r[0] && r[0].conferencias) || [], (r[1] && r[1].historico) || []);
+    }).catch(function () {
+      render(Rconf.confs ? Rconf.confs.list(user) : [], Rconf.historial.list(user));
+    });
+  } else {
+    render(Rconf.confs ? Rconf.confs.list(user) : [], Rconf.historial.list(user));
+  }
+
+  loaderEl.classList.add("hide");
+  setTimeout(function () { loaderEl.style.display = "none"; }, 600);
+})();
+</script>
+</body>
+</html>

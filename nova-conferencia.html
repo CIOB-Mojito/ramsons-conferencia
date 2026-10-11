@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#070b14">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Nova Conferência · RAMSONS</title>
+<link rel="stylesheet" href="rconf-ui.css">
+</head>
+<body>
+
+<div class="glow" aria-hidden="true"></div>
+
+<div class="screen">
+  <header class="app-header">
+    <button type="button" class="back" id="back" aria-label="Voltar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+    <div class="mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#ff7a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+    </div>
+    <div class="brand"><h1>RAM<span>SONS</span></h1><h2>Conferência</h2></div>
+  </header>
+
+  <div class="content">
+    <div class="wrap">
+      <h3 class="screen-title"><span class="bar" aria-hidden="true"></span> Nova Conferência</h3>
+      <p class="intro">Monte sua conferência em andamento. Você pode ter várias ao mesmo tempo — cada uma retomada por separado.</p>
+
+      <!-- ===== Retomada: já existem conferências em andamento ===== -->
+      <section id="viewResume" class="card" hidden>
+        <p class="card-label" id="resumeLabel"><span class="dot" aria-hidden="true"></span> Conferência em andamento</p>
+        <div class="stats" id="resumeStats"></div>
+        <p class="card-hint" id="resumeHint"></p>
+        <div class="row" style="margin-top:14px;">
+          <button type="button" class="btn btn-primary" id="resumeGo" style="flex:2;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l14 9-14 9V3z"/></svg>
+            Continuar
+          </button>
+          <button type="button" class="btn btn-ghost" id="resumeNew" style="flex:1;">Iniciar nova</button>
+        </div>
+        <div id="resumeOutras" style="display:none;flex-direction:column;gap:10px;margin-top:18px;"></div>
+      </section>
+
+      <!-- ===== Seleção de arquivo ===== -->
+      <section id="viewPick" class="card" hidden>
+        <p class="card-label"><span class="dot" aria-hidden="true"></span> Arquivo Excel</p>
+        <button type="button" class="btn btn-primary" id="pickExcel" style="margin-top:14px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+          Selecionar Excel
+        </button>
+        <p class="card-hint">Aceita arquivos .xlsx e .xls — a leitura funciona sem internet.</p>
+
+        <p class="card-label" style="margin-top:20px;">O arquivo Excel deve conter as seguintes informações:</p>
+        <ul class="divlist" style="border:0;">
+          <li class="div" style="border-color:var(--panel-brd);background:var(--panel-2);">
+            <div class="dcode" style="color:var(--accent-2);">CÓDIGO</div>
+            <div class="ddesc" style="font-weight:500;color:var(--txt-dim);font-size:13px;">identificação do item</div>
+          </li>
+          <li class="div" style="border-color:var(--panel-brd);background:var(--panel-2);">
+            <div class="dcode" style="color:var(--accent-2);">DESCRIÇÃO</div>
+            <div class="ddesc" style="font-weight:500;color:var(--txt-dim);font-size:13px;">nome do produto</div>
+          </li>
+          <li class="div" style="border-color:var(--panel-brd);background:var(--panel-2);">
+            <div class="dcode" style="color:var(--accent-2);">QUANTIDADE</div>
+            <div class="ddesc" style="font-weight:500;color:var(--txt-dim);font-size:13px;">unidades a conferir</div>
+          </li>
+        </ul>
+        <p class="card-hint">Essas informações serão utilizadas para conferir cada produto e sua quantidade.</p>
+      </section>
+
+      <!-- ===== Resumo do arquivo carregado ===== -->
+      <section id="viewSummary" class="card" hidden>
+        <p class="card-label ok"><span class="dot" aria-hidden="true"></span> Arquivo carregado</p>
+        <p id="sumFile" style="margin-top:12px;font-size:15px;font-weight:800;letter-spacing:.2px;word-break:break-all;"></p>
+        <div class="stats">
+          <div class="stat accent"><div class="k">Produtos</div><div class="v" id="sumProd">0</div></div>
+          <div class="stat cyan"><div class="k">Unidades</div><div class="v" id="sumUni">0</div></div>
+          <div class="stat"><div class="k">Códigos</div><div class="v" id="sumCod">0</div></div>
+        </div>
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px;">
+          <button type="button" class="btn btn-primary" id="continueConf">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            Continuar para Conferência
+          </button>
+          <button type="button" class="btn btn-ghost" id="loadOther">Carregar outro arquivo</button>
+        </div>
+      </section>
+
+      <!-- ===== Error ===== -->
+      <section id="viewError" class="card" hidden>
+        <p class="card-label warn"><span class="dot" aria-hidden="true"></span> Não foi possível continuar</p>
+        <p id="errMsg" style="margin-top:12px;font-size:14px;line-height:1.5;color:#ffc2c8;"></p>
+        <div id="errList" class="divlist" hidden></div>
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px;">
+          <button type="button" class="btn btn-primary" id="errRetry">Selecionar outro arquivo</button>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<div class="loader" id="loader">
+  <div class="l-mark">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#ff7a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+  </div>
+  <p>Ramsons</p>
+</div>
+
+<script src="rconf-store.js"></script>
+<script src="rconf-flow.js"></script>
+<script src="rconf-excel.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="rconf-api.js"></script>
+<script>
+(function () {
+  "use strict";
+  var user = (typeof Rconf !== "undefined") ? Rconf.session.user() : null;
+  if (!user) { window.location.replace("index.html"); return; }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var toastEl = $("toast"), loaderEl = $("loader");
+
+  var views = { resume: $("viewResume"), pick: $("viewPick"), summary: $("viewSummary"), error: $("viewError") };
+  function show(name) {
+    for (var k in views) if (views[k]) views[k].hidden = (k === "pick") ? false : (k !== name);
+  }
+
+  var toastTimer;
+  function showToast(msg, kind) {
+    toastEl.textContent = msg;
+    toastEl.classList.remove("err", "ok");
+    if (kind) toastEl.classList.add(kind);
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 2200);
+  }
+
+  /* ---------- seleção de arquivo ---------- */
+  var input = $("fileInput");
+  function abrirSeletor() { input.value = ""; input.click(); }
+  $("pickExcel").addEventListener("click", abrirSeletor);
+  $("loadOther").addEventListener("click", abrirSeletor);
+  $("errRetry").addEventListener("click", abrirSeletor);
+
+  $("back").addEventListener("click", function () { window.location.href = "home.html"; });
+
+  /* ---------- continuar (cria a conferência persistente) ---------- */
+  var ultimo = null;   // resultado do parse atual (prévia)
+  $("continueConf").addEventListener("click", function () {
+    if (!ultimo || !ultimo.ok) { showToast("Selecione um arquivo válido.", "err"); return; }
+    var info = { arquivo: ultimo.arquivo, produtos: ultimo.produtos };
+    var btn = this;
+    if (window.RconfApi) {                       // servidor é a fonte principal
+      btn.disabled = true;
+      RconfApi.confStart(info).then(function (d) {
+        var novo = d && d.conferencia;
+        try { Rconf.conf.start(user, info); } catch (e) {}
+        window.location.href = "conferencia.html" + (novo && novo.id ? "?id=" + encodeURIComponent(novo.id) : "");
+      }).catch(function () {                     // fallback local se a API cair
+        btn.disabled = false;
+        var novo = Rconf.conf.start(user, info);
+        window.location.href = "conferencia.html" + (novo && novo.id ? "?id=" + encodeURIComponent(novo.id) : "");
+      });
+      return;
+    }
+    var novo = Rconf.conf.start(user, info);
+    window.location.href = "conferencia.html" + (novo && novo.id ? "?id=" + encodeURIComponent(novo.id) : "");
+  });
+
+  input.addEventListener("change", function () {
+    var f = input.files && input.files[0];
+    if (!f) return;
+    var nome = f.name || "arquivo.xlsx";
+    if (!/\.xlsx?$/i.test(nome)) { mostrarErro("Formato não aceito. Use um arquivo .xlsx ou .xls.", []); return; }
+    var reader = new FileReader();
+    reader.onerror = function () { mostrarErro("Não foi possível ler o arquivo.", []); };
+    reader.onload = function () {
+      var res;
+      try { res = RconfExcel.parseArrayBuffer(reader.result, XLSX); }
+      catch (e) { res = { ok: false, status: "read_error", erro: "Arquivo inválido ou corrompido.", duplicados: [], faltando: [] }; }
+      if (!res.ok) {
+        if (res.status === "missing_columns") {
+          mostrarErro("Colunas obrigatórias ausentes na planilha: " + res.faltando.map(nomeColuna).join(", ") + ". Corrija o arquivo e tente novamente.", []);
+        } else if (res.status === "duplicates") {
+          mostrarErro("Existem códigos duplicados na planilha (" + res.duplicados.length + "). Corrija o arquivo para continuar.", res.duplicados);
+        } else {
+          mostrarErro(res.erro || "Não foi possível ler a planilha.", []);
+        }
+        return;
+      }
+      ultimo = { ok: true, arquivo: nome, produtos: res.produtos };
+      mostrarResumo(nome, res);
+    };
+    reader.readAsArrayBuffer(f);
+  });
+
+  function nomeColuna(f) { return f === "codigo" ? "Código" : f === "descricao" ? "Descrição" : "Quantidade"; }
+
+  function mostrarResumo(nome, res) {
+    $("sumFile").textContent = "“" + nome + "”";
+    $("sumProd").textContent = RconfFlow.formatInt(res.produtos.length);
+    $("sumUni").textContent = RconfFlow.formatInt(res.totalEsperado);
+    $("sumCod").textContent = RconfFlow.formatInt(res.codigos);
+    show("summary");
+    showToast("Arquivo carregado com sucesso.", "ok");
+  }
+
+  function mostrarErro(msg, duplicados) {
+    $("errMsg").textContent = msg;
+    var list = $("errList");
+    list.innerHTML = "";
+    if (duplicados && duplicados.length) {
+      list.hidden = false;
+      var max = Math.min(duplicados.length, 20);
+      for (var i = 0; i < max; i++) {
+        var d = document.createElement("li");
+        d.className = "div";
+        d.innerHTML = '<div class="dcode">' + escapar(duplicados[i]) + '</div><div class="ddesc" style="font-weight:500;color:var(--txt-dim);font-size:12.5px;">código repetido</div>';
+        list.appendChild(d);
+      }
+      if (duplicados.length > max) {
+        var more = document.createElement("li");
+        more.style.cssText = "color:var(--txt-dim);font-size:12px;text-align:center;";
+        more.textContent = "e mais " + (duplicados.length - max) + "…";
+        list.appendChild(more);
+      }
+    } else { list.hidden = true; }
+    show("error");
+    showToast("Não foi possível usar este arquivo.", "err");
+  }
+
+  function escapar(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  /* ---------- retomada ---------- */
+  var recoveringLocal = false;   // cópia local da MESMA conta (recuperação explícita)
+  var activeResume = null;       // conferência ativa vinda do servidor (se houver)
+  function pintarRetomada(conf, recovering) {
+    if (conf === undefined) conf = Rconf.conf.get(user);
+    if (!conf) { show("pick"); return; }
+    recoveringLocal = !!recovering;
+    activeResume = recoveringLocal ? null : conf;
+    var pr = RconfFlow.progress(conf.produtos);
+    $("resumeLabel").innerHTML = '<span class="dot" aria-hidden="true"></span> Conferência em andamento <b style="color:var(--accent-2);">(recente)</b>';
+    var box = $("resumeStats");
+    box.innerHTML =
+      '<div class="stat accent"><div class="k">Conferidos</div><div class="v">' + RconfFlow.formatInt(pr.conferidos) + '</div></div>' +
+      '<div class="stat"><div class="k">Total</div><div class="v">' + RconfFlow.formatInt(pr.total) + '</div></div>' +
+      '<div class="stat cyan"><div class="k">Faltam</div><div class="v">' + RconfFlow.formatInt(pr.faltando) + '</div></div>' +
+      '<div class="stat"><div class="k">Progresso</div><div class="v">' + pr.pct + '%</div></div>';
+    $("resumeHint").textContent = recoveringLocal
+      ? "Cópia local deste dispositivo (mesma conta). “Continuar” envia esta conferência para esta conta e abre na tela de conferência."
+      : "Arquivo: " + (conf.arquivo || "—") + " · aberta desde " + new Date(conf.criadaEm || Date.now()).toLocaleDateString("pt-BR");
+    show("resume");
+  }
+  function pintarOutras(lista) {
+    var box = $("resumeOutras");
+    var extras = (lista || []).slice(1);        // a mais recente já mostra no card acima
+    box.innerHTML = "";
+    if (!extras.length) { box.style.display = "none"; return; }
+    box.style.display = "flex";
+    var head = document.createElement("div");
+    head.className = "card-label";
+    head.style.cssText = "margin:0 0 2px;color:#8f9daf;";
+    head.innerHTML = '<span class="dot" aria-hidden="true"></span> Outras conferências em andamento (' + extras.length + ')';
+    box.appendChild(head);
+    for (var i = 0; i < extras.length; i++) {
+      (function (c) {
+        var pr = RconfFlow.progress(c.produtos);
+        var row = document.createElement("div");
+        row.className = "hitem";
+        row.style.cursor = "pointer";
+        row.setAttribute("data-conf-id", c.id);
+        row.innerHTML =
+          '<div class="hic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div>' +
+          '<div class="hbody"><div class="hfile">' + escapar(c.arquivo || "Conferência") + '</div>' +
+          '<div class="hmeta">Em andamento · ' + pr.conferidos + ' de ' + pr.total + ' conferidos</div></div>' +
+          '<div class="hres"><div class="n">' + pr.pct + '%</div><div class="l">' + pr.faltando + ' faltam</div></div>';
+        row.addEventListener("click", function () { window.location.href = "conferencia.html?id=" + encodeURIComponent(c.id); });
+        box.appendChild(row);
+      })(extras[i]);
+    }
+  }
+  function iniciarRetomada() {
+    if (window.RconfApi) {
+      RconfApi.confList().then(function (d) {
+        var open = (d && d.conferencias) || [];
+        if (open.length) {                        // servidor tem conferências abertas
+          pintarRetomada(open[0], false);
+          pintarOutras(open);
+          return;
+        }
+        // Sem conferência no servidor: NÃO enviar nada em automático.
+        // Se houver cópia local da MESMA conta, oferecemos a retomada EXPLÍCITA
+        // (o usuário decide “Continuar” — envia ao servidor — ou “Iniciar nova”).
+        var local = Rconf.conf.get(user);
+        if (local) pintarRetomada(local, true);
+        else show("pick");
+      }).catch(function () { pintarRetomada(Rconf.conf.get(user), true); });
+    } else {
+      var todos = Rconf.confs.list(user);         // modo offline: todas as abertas locais
+      if (todos.length) { pintarRetomada(todos[0], false); pintarOutras(todos); return; }
+      pintarRetomada();
+    }
+  }
+  $("resumeGo").addEventListener("click", function () {
+    if (window.RconfApi && recoveringLocal) {
+      var local = Rconf.conf.get(user);   // recuperação explícita da MESMA conta
+      if (local) {
+        var btn = $("resumeGo");
+        btn.disabled = true;
+        // envia o MESMO id (upsert): retomar várias vezes nunca duplica a conferência
+        RconfApi.confStart({ id: local.id, arquivo: local.arquivo, produtos: local.produtos })
+          .then(function () { window.location.href = "conferencia.html"; })
+          .catch(function () { btn.disabled = false; window.location.href = "conferencia.html"; });
+        return;
+      }
+    }
+    if (activeResume && activeResume.id) {
+      window.location.href = "conferencia.html?id=" + encodeURIComponent(activeResume.id);
+      return;
+    }
+    window.location.href = "conferencia.html";
+  });
+  $("resumeNew").addEventListener("click", function () {
+    // várias em andamento: iniciar nova NÃO descarta as existentes
+    show("pick");
+    showToast("Escolha um arquivo para a nova conferência.");
+  });
+
+  /* ---------- ripple ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll(".btn"), function (b) {
+    b.addEventListener("pointerdown", function (e) {
+      var r = b.getBoundingClientRect(), s = document.createElement("span");
+      s.className = "ripple";
+      s.style.left = (e.clientX - r.left) + "px"; s.style.top = (e.clientY - r.top) + "px";
+      b.appendChild(s);
+      s.addEventListener("animationend", function () { s.remove(); });
+    });
+  });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+
+  iniciarRetomada();
+  loaderEl.classList.add("hide");
+  setTimeout(function () { loaderEl.style.display = "none"; }, 800);
+})();
+</script>
+</body>
+</html>

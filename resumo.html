@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#070b14">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Resumo · RAMSONS</title>
+<link rel="stylesheet" href="rconf-ui.css">
+</head>
+<body>
+
+<div class="glow" aria-hidden="true"></div>
+
+<div class="screen">
+  <header class="app-header">
+    <button type="button" class="back" id="back" aria-label="Voltar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+    <div class="mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#ff7a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+    </div>
+    <div class="brand"><h1>RAM<span>SONS</span></h1><h2>Resumo</h2></div>
+  </header>
+
+  <div class="content">
+    <div class="wrap">
+      <h3 class="screen-title"><span class="bar" aria-hidden="true"></span> Resumo Final</h3>
+      <p class="intro" id="resIntro">Conferência finalizada.</p>
+
+      <div class="stats">
+        <div class="stat"><div class="k">Produtos</div><div class="v" id="rTotal">0</div></div>
+        <div class="stat good"><div class="k">Conferidos</div><div class="v" id="rConf">0</div></div>
+        <div class="stat accent"><div class="k">Esperado</div><div class="v" id="rEsp">0</div></div>
+        <div class="stat cyan"><div class="k">Encontrado</div><div class="v" id="rEnc">0</div></div>
+      </div>
+
+      <div class="hero-ok" id="heroOk" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        <h3>Conferência sem divergências</h3>
+      </div>
+
+      <section id="divSection" hidden>
+        <p class="card-label warn" style="margin-top:18px;"><span class="dot" aria-hidden="true"></span> Divergências <span id="divCount"></span></p>
+        <div class="divlist" id="divList"></div>
+      </section>
+
+      <div class="card" id="diffCard" hidden>
+        <p class="card-label"><span class="dot" aria-hidden="true"></span> Diferença total</p>
+        <div class="stat bad" style="margin-top:12px;"><div class="k">Encontrado − Esperado</div><div class="v" id="rDif">0</div></div>
+      </div>
+
+      <div style="margin-top:18px;display:flex;flex-direction:column;gap:10px;">
+        <button type="button" class="btn btn-primary" id="goHist">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l3 2"/></svg>
+          Ver Histórico
+        </button>
+        <button type="button" class="btn btn-ghost" id="goHome">Voltar ao Início</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<div class="loader" id="loader">
+  <div class="l-mark">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#ff7a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+  </div>
+  <p>Ramsons</p>
+</div>
+
+<script src="rconf-store.js"></script>
+<script src="rconf-flow.js"></script>
+<script src="rconf-api.js"></script>
+<script>
+(function () {
+  "use strict";
+  var user = (typeof Rconf !== "undefined") ? Rconf.session.user() : null;
+  if (!user) { window.location.replace("index.html"); return; }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var toastEl = $("toast"), loaderEl = $("loader");
+  function showToast(msg, kind) {
+    toastEl.textContent = msg;
+    toastEl.classList.remove("err", "ok");
+    if (kind) toastEl.classList.add(kind);
+    toastEl.classList.add("show");
+    setTimeout(function () { toastEl.classList.remove("show"); }, 2200);
+  }
+
+  /* id vem da URL (?id=...); se não vier, usa o último do histórico */
+  function idDaUrl() {
+    var m = /[?&]id=([^&]+)/.exec(window.location.search || "");
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+
+  function escapar(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  function histLocal(id) {
+    var hist = Rconf.historial.list(user);
+    if (id) { var c = Rconf.historial.get(user, id); if (c) return c; }
+    return hist.length ? hist[hist.length - 1] : null;
+  }
+
+  function render(conf) {
+    if (!conf) {
+      $("resIntro").textContent = "Nenhuma conferência encontrada.";
+      $("rTotal").textContent = "0";
+      return;
+    }
+    var r = RconfFlow.resumo(conf);
+    $("resIntro").textContent = "“" + (conf.arquivo || "conferência") + "” · " + RconfFlow.dataCurta(conf.finalizadaEm || conf.atualizadaEm);
+    $("rTotal").textContent = RconfFlow.formatInt(r.total);
+    $("rConf").textContent = RconfFlow.formatInt(r.conferidos);
+    $("rEsp").textContent = RconfFlow.formatInt(r.esperado);
+    $("rEnc").textContent = RconfFlow.formatInt(r.encontrado);
+
+    var divSection = $("divSection"), divList = $("divList");
+    divList.innerHTML = "";
+    if (r.divergencias.length === 0) {
+      $("heroOk").hidden = false;
+      divSection.hidden = true;
+      $("diffCard").hidden = true;
+    } else {
+      $("heroOk").hidden = true;
+      divSection.hidden = false;
+      $("divCount").textContent = "(" + r.divergencias.length + ")";
+      var frag = document.createDocumentFragment();
+      for (var i = 0; i < r.divergencias.length; i++) {
+        var d = r.divergencias[i];
+        var falta = d.diferenca < 0;
+        var abs = Math.abs(d.diferenca);
+        var el = document.createElement("div");
+        el.className = "div";
+        el.innerHTML =
+          '<div class="dcode">' + escapar(d.codigo) + '</div>' +
+          '<div class="ddesc">' + (escapar(d.descricao) || "Sem descrição") + '</div>' +
+          '<div class="drow">' +
+            '<span>Esperado: <b>' + RconfFlow.formatInt(d.esperado) + '</b></span>' +
+            '<span>Encontrado: <b>' + RconfFlow.formatInt(d.conferido) + '</b></span>' +
+          '</div>' +
+          '<div class="dtag ' + (falta ? "falta" : "sobra") + '">' + (falta ? "Falta " : "Sobra ") + RconfFlow.formatInt(abs) + '</div>';
+        frag.appendChild(el);
+      }
+      divList.appendChild(frag);
+      $("diffCard").hidden = false;
+      var dif = $("rDif");
+      dif.textContent = (r.diferencaTotal > 0 ? "+" : "") + RconfFlow.formatInt(r.diferencaTotal);
+      dif.style.color = r.diferencaTotal < 0 ? "var(--bad)" : "var(--cyan)";
+    }
+  }
+
+  var id = idDaUrl();
+  if (window.RconfApi) {                       // servidor é a fonte principal
+    var p;
+    if (id) {
+      p = RconfApi.histGet(id);
+    } else {
+      p = RconfApi.histList().then(function (d) {
+        var arr = (d && d.historico) || [];
+        return arr.length ? RconfApi.histGet(arr[arr.length - 1].id) : { conferencia: null };
+      });
+    }
+    p.then(function (d) { render(d && d.conferencia); })
+     .catch(function () { render(histLocal(id)); });
+  } else {
+    render(histLocal(id));
+  }
+
+  $("goHist").addEventListener("click", function () { window.location.href = "historico.html"; });
+  $("goHome").addEventListener("click", function () { window.location.href = "home.html"; });
+  $("back").addEventListener("click", function () { window.location.href = "home.html"; });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".btn"), function (b) {
+    b.addEventListener("pointerdown", function (e) {
+      var r = b.getBoundingClientRect(), s = document.createElement("span");
+      s.className = "ripple";
+      s.style.left = (e.clientX - r.left) + "px"; s.style.top = (e.clientY - r.top) + "px";
+      b.appendChild(s);
+      s.addEventListener("animationend", function () { s.remove(); });
+    });
+  });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+
+  loaderEl.classList.add("hide");
+  setTimeout(function () { loaderEl.style.display = "none"; }, 600);
+  void showToast;
+})();
+</script>
+</body>
+</html>

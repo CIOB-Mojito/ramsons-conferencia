@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-visual">
+<meta name="theme-color" content="#070b14">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>RAMSONS Conferência</title>
+<style>
+  :root{
+    --bg-0:#070b14;
+    --bg-1:#0b1220;
+    --panel:rgba(14,20,33,.82);
+    --panel-brd:rgba(255,255,255,.07);
+    --txt:#e8eef8;
+    --txt-dim:#8b97ad;
+    --accent:#ff7a1a;
+    --accent-2:#ffa14a;
+    --cyan:#37d6c4;
+    --danger:#ff8a8a;
+    --radius:18px;
+    --safe-t:env(safe-area-inset-top,0px);
+    --safe-b:env(safe-area-inset-bottom,0px);
+    --safe-l:env(safe-area-inset-left,0px);
+    --safe-r:env(safe-area-inset-right,0px);
+    --bottom-h:210px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overflow:hidden;overscroll-behavior:none;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    background:var(--bg-0);
+    color:var(--txt);
+    -webkit-font-smoothing:antialiased;
+    user-select:none;-webkit-user-select:none;
+    touch-action:none;
+  }
+  input{user-select:text;-webkit-user-select:text;}
+
+  #scene{position:fixed;inset:0;width:100%;height:100%;z-index:0;display:block;touch-action:none;}
+
+  /* Telas (login e início) empilhadas: só uma fica visível por vez */
+  .screen{
+    position:fixed;inset:0;z-index:2;
+    display:flex;flex-direction:column;align-items:stretch;
+    padding-left:var(--safe-l);padding-right:var(--safe-r);
+    pointer-events:none;
+    visibility:hidden;opacity:0;
+    transition:opacity .6s, visibility 0s .6s;
+  }
+  .screen.on{visibility:visible;opacity:1;transition:opacity .6s;}
+
+  /* Palco: área livre onde o 3D é centrado */
+  .stage{flex:1;min-height:0;position:relative;}
+
+  /* ---------- Login ---------- */
+  .sub{
+    position:absolute;left:0;right:0;bottom:10px;text-align:center;
+    font-size:12px;font-weight:600;letter-spacing:6px;padding-left:6px;
+    color:var(--accent);text-transform:uppercase;opacity:0;
+  }
+  .card{
+    width:100%;max-width:480px;margin:0 auto;
+    padding:0 16px calc(var(--safe-b) + 16px);
+  }
+  .panel{
+    pointer-events:auto;
+    display:flex;flex-direction:column;gap:12px;
+    padding:16px;border-radius:22px;
+    background:var(--panel);
+    border:1px solid var(--panel-brd);
+    box-shadow:0 18px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.05);
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  }
+  .field{position:relative;display:block;}
+  .field > svg{
+    position:absolute;left:15px;top:50%;transform:translateY(-50%);
+    width:18px;height:18px;color:var(--txt-dim);pointer-events:none;transition:color .2s;
+  }
+  .field:focus-within > svg{color:var(--cyan);}
+  .field input{
+    width:100%;height:52px;border-radius:14px;
+    border:1px solid var(--panel-brd);
+    background:rgba(8,13,24,.7);color:var(--txt);
+    font:inherit;font-size:16px;padding:0 48px 0 46px;outline:none;
+    transition:border-color .2s, box-shadow .2s;
+  }
+  .field input::placeholder{color:#5f6c82;}
+  .field input:focus{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(55,214,196,.18);}
+  .field.bad input{border-color:var(--danger);box-shadow:0 0 0 3px rgba(255,138,138,.14);}
+  .opts{display:flex;align-items:center;padding:0 2px;}
+  .chk{display:flex;align-items:center;gap:10px;min-height:32px;font-size:13px;color:var(--txt-dim);cursor:pointer;position:relative;}
+  .chk input{position:absolute;opacity:0;width:1px;height:1px;}
+  .chk .bx{
+    width:20px;height:20px;border-radius:6px;display:grid;place-items:center;
+    border:1.5px solid rgba(255,255,255,.28);transition:background .2s,border-color .2s;
+  }
+  .chk .bx svg{width:13px;height:13px;color:#1a0d02;opacity:0;transform:scale(.6);transition:opacity .2s,transform .2s;}
+  .chk input:checked + .bx{background:var(--accent);border-color:var(--accent);}
+  .chk input:checked + .bx svg{opacity:1;transform:none;}
+  .chk input:focus-visible + .bx{outline:2px solid var(--cyan);outline-offset:2px;}
+  .err{min-height:18px;font-size:12.5px;color:var(--danger);text-align:center;letter-spacing:.2px;}
+  .btn-primary[disabled]{filter:saturate(.7) brightness(.92);cursor:default;}
+  .spin{
+    width:18px;height:18px;border-radius:50%;
+    border:2.5px solid rgba(26,13,2,.28);border-top-color:#1a0d02;
+    animation:spin .7s linear infinite;
+  }
+
+  /* ---------- Botões ---------- */
+  .btn{
+    position:relative;overflow:hidden;
+    display:flex;align-items:center;justify-content:center;gap:9px;
+    width:100%;border:0;cursor:pointer;font-family:inherit;
+    letter-spacing:1.6px;text-transform:uppercase;
+    transition:transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .18s, filter .18s;
+    pointer-events:auto;
+  }
+  .btn:active{transform:scale(.965);filter:brightness(1.08);}
+  .btn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+  .btn svg{width:17px;height:17px;flex:0 0 17px;}
+  .btn-primary{
+    padding:19px 20px;border-radius:var(--radius);
+    font-size:15.5px;font-weight:800;color:#1a0d02;
+    background:linear-gradient(135deg,var(--accent-2),var(--accent) 55%,#f06a00);
+    box-shadow:0 12px 30px rgba(255,122,26,.32), inset 0 1px 0 rgba(255,255,255,.45);
+  }
+  .btn-primary::after{
+    content:"";position:absolute;top:0;left:-60%;width:45%;height:100%;
+    background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent);
+    animation:sheen 3.4s 1.2s infinite;
+  }
+  .ripple{
+    position:absolute;width:24px;height:24px;border-radius:50%;pointer-events:none;
+    background:rgba(255,255,255,.45);
+    transform:translate(-50%,-50%) scale(0);
+    animation:rip .55s ease-out forwards;
+  }
+
+  #toast{
+    position:fixed;left:50%;bottom:calc(var(--bottom-h) + 12px);
+    transform:translate(-50%,14px);z-index:5;
+    width:max-content;max-width:calc(100vw - 32px);text-align:center;
+    padding:11px 20px;border-radius:12px;
+    background:rgba(16,23,38,.94);border:1px solid rgba(255,122,26,.35);
+    color:#ffd9b5;font-size:12.5px;letter-spacing:.6px;
+    opacity:0;pointer-events:none;
+    transition:opacity .3s, transform .3s cubic-bezier(.2,.8,.2,1);
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  }
+  #toast.show{opacity:1;transform:translate(-50%,0);}
+
+  .loader{
+    position:fixed;inset:0;z-index:9;background:var(--bg-0);
+    display:grid;place-items:center;
+    transition:opacity .7s .1s;
+  }
+  .loader.hide{opacity:0;pointer-events:none;}
+  .loader .l-wrap{display:flex;flex-direction:column;align-items:center;}
+  .loader .l-mark{
+    width:56px;height:56px;border-radius:17px;display:grid;place-items:center;
+    background:linear-gradient(145deg,#1a2436,#0e1524);
+    border:1px solid rgba(255,122,26,.4);
+    animation:breath 1.6s ease-in-out infinite;
+  }
+  .loader .l-mark svg{width:28px;height:28px;}
+  .loader p{font-size:11px;letter-spacing:5px;padding-left:5px;color:var(--txt-dim);text-transform:uppercase;margin-top:16px;}
+
+  /* Animações de entrada: só rodam quando a tela fica ativa */
+  .screen.on .card{animation:fadeInUp .9s .6s cubic-bezier(.2,.8,.2,1) both;}
+  .screen.on .sub{animation:fadeIn 1s 3s both;}
+
+  /* Telas baixas */
+  @media (max-height:700px){
+    .btn-primary{padding:15px 18px;}
+    .card{padding-bottom:calc(var(--safe-b) + 12px);}
+    .panel{padding:14px;gap:10px;}
+    .field input{height:48px;}
+  }
+  @media (max-height:560px){
+    .sub{display:none;}
+  }
+  /* Celular deitado: 3D à esquerda, painel à direita */
+  @media (orientation:landscape) and (max-height:540px){
+    .screen{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,380px);grid-template-rows:auto auto minmax(0,1fr);}
+    #screenLogin .stage{grid-column:1;grid-row:1 / 4;}
+    #screenLogin .card{grid-column:2;grid-row:1 / 4;align-self:center;max-width:none;margin:0;padding-top:calc(var(--safe-t) + 8px);}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;}
+  }
+
+  @keyframes fadeInUp{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes rip{to{transform:translate(-50%,-50%) scale(14);opacity:0}}
+  @keyframes sheen{0%{left:-60%}55%,100%{left:130%}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes breath{0%,100%{transform:scale(1);box-shadow:0 0 0 rgba(255,122,26,0)}50%{transform:scale(1.07);box-shadow:0 0 26px rgba(255,122,26,.3)}}
+</style>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+
+<!-- ===== LOGIN ===== -->
+<section class="screen" id="screenLogin" aria-label="Login">
+  <div class="stage" id="stageLogin"><p class="sub">Conferência</p></div>
+
+  <div class="card" id="card">
+    <form class="panel" id="loginForm" novalidate>
+      <label class="field" id="fUser">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg>
+        <input id="user" name="username" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" placeholder="Usuário" aria-label="Usuário">
+      </label>
+      <div class="field" id="fPass">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <input id="pass" name="pin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="PIN" aria-label="PIN">
+      </div>
+      <div class="opts">
+        <label class="chk">
+          <input type="checkbox" id="rem">
+          <span class="bx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span>
+          Lembrar usuário
+        </label>
+      </div>
+      <p class="err" id="err" role="alert"></p>
+      <button type="submit" class="btn btn-primary" id="go"><span id="goLbl">Entrar</span></button>
+    </form>
+  </div>
+</section>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<div class="loader" id="loader">
+  <div class="l-wrap">
+    <div class="l-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#ff7a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>
+      </svg>
+    </div>
+    <p>Ramsons</p>
+  </div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="rconf-store.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* =====================================================================
+     AUTENTICAÇÃO
+     1) Tenta POST /api/login  { usuario, pin }  ->  { ok: true }
+        (401/403 ou { ok:false } = credenciais inválidas)
+     2) Se a API não existir ainda, cai no modo DEMO abaixo.
+        >>> REMOVA o modo DEMO quando o /api/login estiver pronto. <<<
+     ===================================================================== */
+  var DEMO_USERS = (typeof Rconf !== "undefined" && Rconf.USERS) ? Rconf.USERS : [
+    { user: "Ismael", pin: "1234" },
+    { user: "Anderson", pin: "1234" }
+  ];
+
+  function authenticate(u, p) {
+    return fetch("/api/login", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ usuario: u, pin: p })
+    }).then(function (r) {
+      if (r.status === 401 || r.status === 403) return { ok: false };
+      if (!r.ok) throw new Error("sem api");
+      return r.json().then(function (d) {
+        if (d && (d.ok === true || d.token)) return { ok: true, id: d.id || null };
+        if (d && d.ok === false) return { ok: false };
+        throw new Error("resposta inesperada");
+      });
+    }).catch(function () {
+      var demo = DEMO_USERS.some(function (c) { return c.user === u && c.pin === p; });
+      return { ok: demo, id: null };   // demo/offline: identidade local via seedId
+    });
+  }
+
+  /* ---------- Utilidades ---------- */
+  var $ = function (id) { return document.getElementById(id); };
+  var canvas = $("scene"), loginEl = $("screenLogin");
+  var stageLoginEl = $("stageLogin"), cardEl = $("card");
+  var toastEl = $("toast"), loaderEl = $("loader");
+  var form = $("loginForm"), userEl = $("user"), passEl = $("pass"), remEl = $("rem");
+  var errEl = $("err"), goEl = $("go"), goLbl = $("goLbl");
+  var reduce = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  var clamp = function (v, a, b) { return Math.min(b, Math.max(a, v)); };
+  var lerp = function (a, b, t) { return a + (b - a) * t; };
+  var easeOutCubic = function (x) { return 1 - Math.pow(1 - x, 3); };
+
+  /* ---------- Toast + ripple ---------- */
+  var toastTimer;
+  function showToast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 2000);
+  }
+  Array.prototype.forEach.call(document.querySelectorAll(".btn"), function (b) {
+    b.addEventListener("pointerdown", function (e) {
+      var r = b.getBoundingClientRect(), s = document.createElement("span");
+      s.className = "ripple";
+      s.style.left = (e.clientX - r.left) + "px";
+      s.style.top = (e.clientY - r.top) + "px";
+      b.appendChild(s);
+      s.addEventListener("animationend", function () { s.remove(); });
+    });
+    b.addEventListener("click", function () {
+      var m = b.getAttribute("data-msg");
+      if (m) showToast(m);
+    });
+  });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+
+  /* ---------- Renderer ---------- */
+  var renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+  } catch (err) {
+    loaderEl.classList.add("hide");
+    loginEl.classList.add("on");
+    showToast("Seu aparelho não suporta o 3D");
+    return;
+  }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.2;
+  var maxAniso = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+
+  function tex(c, repeat) {
+    var t = new THREE.CanvasTexture(c);
+    t.encoding = THREE.sRGBEncoding;
+    t.anisotropy = maxAniso;
+    if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    return t;
+  }
+
+  var scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x070b14, 10, 30);
+
+  (function () {
+    var c = document.createElement("canvas");
+    c.width = 4; c.height = 256;
+    var g = c.getContext("2d");
+    var grd = g.createLinearGradient(0, 0, 0, 256);
+    grd.addColorStop(0, "#101a2e");
+    grd.addColorStop(0.45, "#0a1120");
+    grd.addColorStop(1, "#05080f");
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 4, 256);
+    var t = new THREE.CanvasTexture(c);
+    t.encoding = THREE.sRGBEncoding;
+    scene.background = t;
+  })();
+
+  var camera = new THREE.PerspectiveCamera(42, 1, 0.3, 80);
+
+  /* ---------- Luzes ---------- */
+  scene.add(new THREE.HemisphereLight(0x9fc3ff, 0x1a1410, 0.62));
+
+  var key = new THREE.DirectionalLight(0xfff2e2, 2.8);
+  key.position.set(3.6, 6.6, 4.6);
+  key.castShadow = true;
+  key.shadow.mapSize.set(1024, 1024);
+  key.shadow.camera.near = 1;
+  key.shadow.camera.far = 24;
+  key.shadow.camera.left = -4.5;
+  key.shadow.camera.right = 4.5;
+  key.shadow.camera.top = 4.5;
+  key.shadow.camera.bottom = -4.5;
+  key.shadow.bias = -0.0012;
+  key.shadow.radius = 3;
+  scene.add(key);
+
+  var rimA = new THREE.DirectionalLight(0x37d6c4, 1.4);
+  rimA.position.set(-5, 2.4, -3.5);
+  scene.add(rimA);
+
+  var rimB = new THREE.DirectionalLight(0xff7a1a, 0.95);
+  rimB.position.set(3, 1.2, -5);
+  scene.add(rimB);
+
+  var front = new THREE.DirectionalLight(0xffe9d2, 0.9);
+  front.position.set(-2.4, 2.8, 5.5);
+  scene.add(front);
+
+  var fill = new THREE.PointLight(0xffb066, 0.8, 14, 2);
+  fill.position.set(-2, 2.6, 3);
+  scene.add(fill);
+
+  /* ---------- Texturas ---------- */
+  function logoBoxTexture() {
+    var c = document.createElement("canvas");
+    c.width = c.height = 128;
+    var g = c.getContext("2d");
+    g.fillStyle = "#ffffff";
+    g.fillRect(0, 0, 128, 128);
+    for (var i = 0; i < 500; i++) {
+      g.fillStyle = "rgba(0,0,0," + (Math.random() * 0.06) + ")";
+      g.fillRect(Math.random() * 128, Math.random() * 128, 2, 2);
+    }
+    g.fillStyle = "rgba(0,0,0,.08)";
+    g.fillRect(50, 0, 28, 128);
+    g.fillStyle = "rgba(255,255,255,.4)";
+    g.fillRect(50, 0, 3, 128);
+    g.fillRect(75, 0, 3, 128);
+    g.strokeStyle = "rgba(0,0,0,.3)";
+    g.lineWidth = 6;
+    g.strokeRect(3, 3, 122, 122);
+    return tex(c);
+  }
+
+  function groundTexture() {
+    var c = document.createElement("canvas");
+    c.width = 512; c.height = 512;
+    var g = c.getContext("2d");
+    var grd = g.createRadialGradient(256, 256, 30, 256, 256, 256);
+    grd.addColorStop(0, "#141c2c");
+    grd.addColorStop(0.5, "#0b111e");
+    grd.addColorStop(1, "#05080f");
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 512, 512);
+    g.strokeStyle = "rgba(120,150,200,.07)";
+    g.lineWidth = 1;
+    for (var i = 0; i <= 16; i++) {
+      g.beginPath(); g.moveTo(i * 32, 0); g.lineTo(i * 32, 512); g.stroke();
+      g.beginPath(); g.moveTo(0, i * 32); g.lineTo(512, i * 32); g.stroke();
+    }
+    return tex(c);
+  }
+
+  /* ---------- Chão e anéis ---------- */
+  var ground = new THREE.Mesh(
+    new THREE.CircleGeometry(14, 64),
+    new THREE.MeshStandardMaterial({ map: groundTexture(), roughness: 0.92, metalness: 0.05 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  var glow = new THREE.Mesh(
+    new THREE.RingGeometry(1.05, 2.35, 72),
+    new THREE.MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: 0.075, side: THREE.DoubleSide })
+  );
+  glow.rotation.x = -Math.PI / 2;
+  glow.position.y = 0.004;
+  scene.add(glow);
+
+  var ring = new THREE.Mesh(
+    new THREE.RingGeometry(1.62, 1.66, 96),
+    new THREE.MeshBasicMaterial({ color: 0x37d6c4, transparent: true, opacity: 0.3, side: THREE.DoubleSide })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.006;
+  scene.add(ring);
+
+  /* ---------- LOGO feito de caixas: RAM / SONS ---------- */
+  var GLYPH = {
+    R: ["1111.", "1...1", "1...1", "1111.", "1.1..", "1..1.", "1...1"],
+    A: [".111.", "1...1", "1...1", "11111", "1...1", "1...1", "1...1"],
+    M: ["1...1", "11.11", "1.1.1", "1.1.1", "1...1", "1...1", "1...1"],
+    S: [".1111", "1....", "1....", ".111.", "....1", "....1", "1111."],
+    O: [".111.", "1...1", "1...1", "1...1", "1...1", "1...1", ".111."],
+    N: ["1...1", "11..1", "1.1.1", "1..11", "1...1", "1...1", "1...1"]
+  };
+  var CELL = 0.24, BOXS = 0.212, ROWS = 16;
+  var LY = (ROWS * CELL) / 2 + 0.6;       /* altura do centro do logo no mundo */
+  var slots = [];
+  [["RAM", 0], ["SONS", 1]].forEach(function (ln) {
+    var text = ln[0], li = ln[1];
+    var cols = text.length * 5 + text.length - 1;
+    var x0 = -((cols - 1) * CELL) / 2;
+    var y0 = ((ROWS - 1) * CELL) / 2 - li * 9 * CELL;
+    for (var g = 0; g < text.length; g++) {
+      var rows = GLYPH[text.charAt(g)];
+      for (var r = 0; r < 7; r++) for (var c = 0; c < 5; c++) {
+        if (rows[r].charAt(c) === "1") slots.push({ x: x0 + (g * 6 + c) * CELL, y: y0 - r * CELL, l: li });
+      }
+    }
+  });
+  var N = slots.length;
+
+  var logoGroup = new THREE.Group();
+  logoGroup.position.set(0, LY, 0);
+  scene.add(logoGroup);
+
+  var logoMesh = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(BOXS, BOXS, BOXS),
+    new THREE.MeshStandardMaterial({ map: logoBoxTexture(), roughness: 0.68, metalness: 0.05 }),
+    N
+  );
+  logoMesh.castShadow = true;
+  logoMesh.receiveShadow = true;
+  logoMesh.frustumCulled = false;
+  logoGroup.add(logoMesh);
+
+  var baseCol = [], sweepCol = new THREE.Color(0x9ffcf0).convertSRGBToLinear(), tmpCol = new THREE.Color();
+  var sx = new Float32Array(N), sy = new Float32Array(N), sz = new Float32Array(N);
+  var srx = new Float32Array(N), sry = new Float32Array(N), srz = new Float32Array(N);
+  var dly = new Float32Array(N), dur = new Float32Array(N), arc = new Float32Array(N);
+  var dummy = new THREE.Object3D();
+
+  slots.forEach(function (sl, i) {
+    var c = new THREE.Color();
+    if (sl.l === 0) c.setHSL(0.6, 0.12, 0.8 + Math.random() * 0.07);
+    else c.setHSL(0.065 + (Math.random() - 0.5) * 0.015, 1, 0.53 + Math.random() * 0.06);
+    c.convertSRGBToLinear();
+    baseCol.push(c);
+    logoMesh.setColorAt(i, c);
+
+    var th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1), rad = 7 + Math.random() * 7;
+    sx[i] = Math.sin(ph) * Math.cos(th) * rad * 1.25;
+    sy[i] = Math.max(-LY + 0.4, Math.cos(ph) * rad * 0.75 + 1.5);
+    sz[i] = Math.sin(ph) * Math.sin(th) * rad;
+    srx[i] = (Math.random() - 0.5) * 12; sry[i] = (Math.random() - 0.5) * 12; srz[i] = (Math.random() - 0.5) * 12;
+    dly[i] = 0.25 + Math.random() * 1.35;
+    dur[i] = 1.0 + Math.random() * 0.75;
+    arc[i] = 0.4 + Math.random() * 1.6;
+  });
+  logoMesh.instanceColor.needsUpdate = true;
+
+  var logoT0 = performance.now();
+  var sweeping = false;
+
+  function updateLogo(now, t) {
+    var tl = (now - logoT0) / 1000;
+    for (var i = 0; i < N; i++) {
+      var k = reduce ? 1 : clamp((tl - dly[i]) / dur[i], 0, 1);
+      var e = easeOutCubic(k), sl = slots[i];
+      var x = lerp(sx[i], sl.x, e), y = lerp(sy[i], sl.y, e) + Math.sin(Math.PI * k) * arc[i], z = lerp(sz[i], 0, e);
+      var rx = srx[i] * (1 - e), ry = sry[i] * (1 - e), rz = srz[i] * (1 - e);
+      if (k >= 1) {
+        y += Math.sin(t * 1.4 + i * 0.7) * 0.007;
+        z += Math.cos(t * 1.1 + i) * 0.006;
+      }
+      dummy.position.set(x, y, z);
+      dummy.rotation.set(rx, ry, rz);
+      dummy.scale.setScalar(k <= 0 ? 0.0001 : Math.min(1, k * 8));
+      dummy.updateMatrix();
+      logoMesh.setMatrixAt(i, dummy.matrix);
+    }
+    logoMesh.instanceMatrix.needsUpdate = true;
+
+    /* faixa de luz (estilo scanner) cruzando o logo depois de montado */
+    var ss = reduce ? -1 : (tl - 3.4) % 5.5;
+    if (tl > 3.4 && ss >= 0 && ss < 1.8) {
+      var sxp = -3.3 + (ss / 1.8) * 6.6;
+      for (var j = 0; j < N; j++) {
+        var bb = Math.max(0, 1 - Math.abs(slots[j].x - sxp) / 0.65);
+        tmpCol.copy(baseCol[j]).lerp(sweepCol, bb * 0.8);
+        logoMesh.setColorAt(j, tmpCol);
+      }
+      logoMesh.instanceColor.needsUpdate = true;
+      sweeping = true;
+    } else if (sweeping) {
+      for (var m = 0; m < N; m++) logoMesh.setColorAt(m, baseCol[m]);
+      logoMesh.instanceColor.needsUpdate = true;
+      sweeping = false;
+    }
+  }
+
+  /* ---------- Enquadramento: centra o 3D na área livre da tela ---------- */
+  var W = 1, H = 1, tanHalf = Math.tan(camera.fov * Math.PI / 360);
+  var vLogin = { tx: 0, ty: LY, tz: 0, el: 0.08, d: 18, cx: 0, cy: 0 };
+
+  /* distância para o objeto (ow x oh, em metros) ocupar "fit" do palco */
+  function fitDist(rect, ow, oh, fit) {
+    var sw = Math.max(90, rect.width), sh = Math.max(90, rect.height);
+    return Math.max(ow * H / (2 * sw * fit * tanHalf), oh * H / (2 * sh * fit * tanHalf));
+  }
+
+  function measure(force) {
+    var a = document.activeElement;
+    if (!force && a && a.tagName === "INPUT") return;  /* teclado aberto: não reenquadra */
+    W = canvas.clientWidth || window.innerWidth;
+    H = canvas.clientHeight || window.innerHeight;
+    renderer.setSize(W, H, false);
+    camera.aspect = W / H;
+    var rl = stageLoginEl.getBoundingClientRect();
+    vLogin.d = fitDist(rl, 5.75, 4.05, 0.8);
+    vLogin.cx = rl.left + rl.width / 2; vLogin.cy = rl.top + rl.height / 2;
+    document.documentElement.style.setProperty("--bottom-h", cardEl.offsetHeight + "px");
+  }
+  window.addEventListener("resize", function () { measure(false); });
+  window.addEventListener("orientationchange", function () { setTimeout(function () { measure(true); }, 250); });
+  window.addEventListener("focusout", function () { setTimeout(function () { measure(false); }, 200); });
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", function () { measure(false); });
+  if (window.ResizeObserver) {
+    var ro = new ResizeObserver(function () { measure(false); });
+    ro.observe(stageLoginEl); ro.observe(cardEl);
+  }
+  measure(true);
+
+  /* ---------- Gestos: paralaxe suave do logo ---------- */
+  var ptrX = 0, ptrY = 0, ptrCX = 0, ptrCY = 0;
+  var pointers = {};
+
+  function blurInputs() {
+    var a = document.activeElement;
+    if (a && a.tagName === "INPUT") a.blur();
+  }
+
+  canvas.addEventListener("pointerdown", function (e) {
+    canvas.setPointerCapture(e.pointerId);
+    blurInputs();
+    pointers[e.pointerId] = true;
+    ptrX = (e.clientX / W - 0.5) * 2; ptrY = (e.clientY / H - 0.5) * 2;
+  });
+
+  canvas.addEventListener("pointermove", function (e) {
+    if (e.pointerType === "mouse" || pointers[e.pointerId]) {
+      ptrX = (e.clientX / W - 0.5) * 2; ptrY = (e.clientY / H - 0.5) * 2;
+    }
+  });
+
+  function endPointer(e) {
+    if (!pointers[e.pointerId]) return;
+    delete pointers[e.pointerId];
+    if (e.pointerType !== "mouse") { ptrX = 0; ptrY = 0; }
+  }
+  canvas.addEventListener("pointerup", endPointer);
+  canvas.addEventListener("pointercancel", endPointer);
+
+  /* ---------- Formulário de login ---------- */
+  var KEY = "rconf_user", busy = false;
+  function lsGet() { try { return localStorage.getItem(KEY) || ""; } catch (e) { return ""; } }
+  function lsSet(v) {
+    try { if (v) localStorage.setItem(KEY, v); else localStorage.removeItem(KEY); } catch (e) {}
+  }
+  var saved = lsGet();
+  if (saved) { userEl.value = saved; remEl.checked = true; }
+
+  function setErr(msg, field) {
+    errEl.textContent = msg || "";
+    $("fUser").classList.remove("bad"); $("fPass").classList.remove("bad");
+    if (msg && field) $(field).classList.add("bad");
+  }
+  userEl.addEventListener("input", function () { setErr(""); });
+  passEl.addEventListener("input", function () {
+    setErr("");
+    var v = passEl.value.replace(/[^0-9]/g, "");
+    if (v !== passEl.value) passEl.value = v;
+  });
+
+  function setBusy(v) {
+    busy = v;
+    goEl.disabled = v;
+    goLbl.innerHTML = v ? '<span class="spin" aria-hidden="true"></span>' : "Entrar";
+  }
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (busy) return;
+    var u = userEl.value.trim(), p = passEl.value;
+    if (!u) { setErr("Informe o usuário", "fUser"); userEl.focus(); return; }
+    if (!p) { setErr("Informe o PIN", "fPass"); passEl.focus(); return; }
+    setErr("");
+    setBusy(true);
+    var t0 = Date.now();
+    authenticate(u, p).then(function (res) {
+      setTimeout(function () {
+        if (res.ok) {
+          lsSet(remEl.checked ? u : "");
+          try { if (typeof Rconf !== "undefined") Rconf.session.set({ user: u, id: res.id || null }); } catch (e) {}
+          blurInputs();
+          loginEl.classList.remove("on");
+          setTimeout(function () { window.location.href = "home.html"; }, reduce ? 60 : 400);
+        } else {
+          setBusy(false);
+          passEl.value = "";
+          setErr("Usuário ou PIN inválidos", "fPass");
+          passEl.focus();
+        }
+      }, Math.max(0, 700 - (Date.now() - t0)));
+    });
+  });
+
+  /* ---------- Loop ---------- */
+  var last = performance.now(), shown = false;
+  var cam = { tx: 0, ty: LY, tz: 0, el: 0.08, d: 18, cx: 0, cy: 0 };
+
+  function frame(now) {
+    requestAnimationFrame(frame);
+    var dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    var t = now / 1000;
+
+    /* logo: montagem + paralaxe */
+    updateLogo(now, t);
+    var sm = Math.min(1, dt * 5);
+    ptrCX += (ptrX - ptrCX) * sm; ptrCY += (ptrY - ptrCY) * sm;
+    logoGroup.rotation.y = ptrCX * 0.4 + (reduce ? 0 : Math.sin(t * 0.45) * 0.06);
+    logoGroup.rotation.x = ptrCY * 0.14;
+
+    /* câmera (sempre na tela de login) */
+    cam.tx = vLogin.tx; cam.ty = vLogin.ty; cam.tz = vLogin.tz; cam.el = vLogin.el;
+    cam.d = vLogin.d; cam.cx = vLogin.cx; cam.cy = vLogin.cy;
+    camera.position.set(cam.tx, cam.ty + Math.sin(cam.el) * cam.d, cam.tz + Math.cos(cam.el) * cam.d);
+    camera.lookAt(cam.tx, cam.ty, cam.tz);
+    camera.setViewOffset(W, H, W / 2 - cam.cx, H / 2 - cam.cy, W, H);
+    scene.fog.near = cam.d + 4;
+    scene.fog.far = cam.d + 20;
+
+    ring.material.opacity = 0.26 + 0.08 * Math.sin(t * 1.6);
+    glow.material.opacity = 0.07 + 0.025 * Math.sin(t * 1.6 + 1.2);
+
+    renderer.render(scene, camera);
+
+    if (!shown) {
+      shown = true;
+      logoT0 = performance.now();
+      loaderEl.classList.add("hide");
+      loginEl.classList.add("on");
+      setTimeout(function () { loaderEl.style.display = "none"; }, 900);
+    }
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

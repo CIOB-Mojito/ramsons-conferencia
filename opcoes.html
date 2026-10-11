@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#070b14">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Opções · RAMSONS</title>
+<link rel="stylesheet" href="rconf-ui.css">
+<style>
+  .opt-intro{margin-top:8px;font-size:13px;line-height:1.5;color:var(--txt-dim);}
+  .perfil{display:flex;align-items:center;gap:13px;} 
+  .perfil .pic{width:46px;height:46px;flex:0 0 46px;border-radius:50%;
+    background:linear-gradient(145deg,#1a2436,#0e1524);border:1px solid rgba(255,122,26,.4);
+    color:var(--accent-2);font-weight:800;font-size:18px;display:grid;place-items:center;text-transform:uppercase;}
+  .perfil .pbody{min-width:0;flex:1;}
+  .perfil .pname{font-size:16px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .perfil .prole{margin-top:4px;}
+  .perfil .prole .tag{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:800;
+    letter-spacing:1.4px;text-transform:uppercase;padding:4px 10px;border-radius:99px;
+    border:1px solid rgba(255,122,26,.4);color:var(--accent-2);background:rgba(255,122,26,.1);}
+  .perfil .prole .tag .dot{width:6px;height:6px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);}
+  .pmenu{margin-top:16px;display:flex;flex-direction:column;gap:11px;}
+  .pmenu .btn svg{flex:0 0 17px;}
+  .pmenu .btn[hidden]{display:none!important;}
+  .logout-hint{margin-top:14px;text-align:center;font-size:11px;color:#6f7c93;letter-spacing:.3px;}
+  .sheet .s-title{text-align:center;font-size:16px;font-weight:800;line-height:1.4;}
+  .sheet .s-actions{display:flex;flex-direction:column;gap:10px;}
+</style>
+</head>
+<body>
+
+<div class="glow" aria-hidden="true"></div>
+
+<div class="screen">
+  <header class="app-header">
+    <button type="button" class="back" id="back" aria-label="Voltar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+    <div class="mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#ff7a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+    </div>
+    <div class="brand"><h1>RAM<span>SONS</span></h1><h2>Opções</h2></div>
+  </header>
+
+  <div class="content">
+    <div class="wrap">
+      <h3 class="screen-title"><span class="bar" aria-hidden="true"></span> Opções</h3>
+      <p class="opt-intro" id="opcIntro">Gerencie sua conta neste dispositivo.</p>
+
+      <div class="card" id="perfilCard">
+        <div class="perfil" id="perfilBox"></div>
+      </div>
+
+      <div class="pmenu" id="menu">
+        <button type="button" class="btn btn-ghost" id="btnUsers" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7" r="4"/><path d="M17 11a4 4 0 1 0 0-8"/><path d="M1 21v-1a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v1"/></svg>
+          Usuários
+        </button>
+        <button type="button" class="btn btn-ghost" id="btnPerfil">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+          Alterar senha
+        </button>
+        <button type="button" class="btn btn-ghost" id="btnHome">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9.5 21v-6h5v6"/></svg>
+          Menu principal
+        </button>
+        <button type="button" class="btn btn-danger" id="btnLogout">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+          Sair da conta
+        </button>
+      </div>
+      <p class="logout-hint">Sair mantém suas conferências e seu histórico.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmação de logout -->
+<div class="overlay" id="logBox" aria-hidden="true">
+  <div class="scrim"></div>
+  <div class="sheet">
+    <div class="grab" aria-hidden="true"></div>
+    <p class="s-title">Deseja realmente sair da sua conta?</p>
+    <p class="s-hint">Suas conferências e histórico não serão apagados.</p>
+    <div class="s-actions">
+      <button type="button" class="btn btn-ghost" id="btnCancel">Cancelar</button>
+      <button type="button" class="btn btn-danger" id="btnConfirm">Sim, sair</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<div class="loader" id="loader">
+  <div class="l-wrap">
+    <div class="l-mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#ff7a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+    </div>
+    <p>Ramsons</p>
+  </div>
+</div>
+
+<script src="rconf-store.js"></script>
+<script src="rconf-api.js"></script>
+<script>
+(function () {
+  "use strict";
+  var user = (typeof Rconf !== "undefined") ? Rconf.session.user() : null;
+  if (!user) { window.location.replace("index.html"); return; }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var loaderEl = $("loader"), toastEl = $("toast"), logBox = $("logBox");
+  var perfilBox = $("perfilBox"), btnUsers = $("btnUsers");
+  var role = null;
+
+  function escapar(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  var toastTimer;
+  function showToast(msg, ok) {
+    toastEl.textContent = msg;
+    toastEl.classList.toggle("ok", !!ok);
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 2200);
+  }
+
+  function roleName(r) { return r === "ADM" ? "Administrador" : r === "USUARIO" ? "Usuário" : "—"; }
+
+  function renderPerfil(u, r) {
+    role = r === "ADM" ? "ADM" : r === "USUARIO" ? "USUARIO" : null;
+    var ini = escapar(String(u || "?")).charAt(0).toUpperCase();
+    perfilBox.innerHTML =
+      '<div class="pic">' + ini + '</div>' +
+      '<div class="pbody">' +
+        '<div class="pname">' + escapar(u) + '</div>' +
+        '<div class="prole"><span class="tag"><span class="dot"></span>' + escapar(roleName(role)) + '</span></div>' +
+      '</div>';
+    btnUsers.hidden = role !== "ADM";
+  }
+
+  /* O rol vem SEMPRE da API (sessão no servidor); nunca do localStorage.
+     Sem resposta da API, o padrão é seguro: admin fica oculto. */
+  if (window.RconfApi) {
+    RconfApi.me().then(function (d) { renderPerfil(d && d.user ? d.user : user, d && d.role ? d.role : null); })
+      .catch(function () { renderPerfil(user, null); });
+  } else {
+    renderPerfil(user, null);
+  }
+
+  /* ---------- navegação ---------- */
+  $("back").addEventListener("click", function () { window.location.href = "home.html"; });
+  $("btnHome").addEventListener("click", function () { showToast("Em breve!"); });
+  $("btnPerfil").addEventListener("click", function () { window.location.href = "perfil.html"; });
+  btnUsers.addEventListener("click", function () {
+    if (role === "ADM") window.location.href = "usuarios.html";
+  });
+
+  /* ---------- logout com confirmação ---------- */
+  function openLog() { logBox.classList.add("show"); logBox.setAttribute("aria-hidden", "false"); }
+  function closeLog() { logBox.classList.remove("show"); logBox.setAttribute("aria-hidden", "true"); }
+  $("btnLogout").addEventListener("click", openLog);
+  $("btnCancel").addEventListener("click", closeLog);
+  logBox.addEventListener("click", function (e) { if (e.target === logBox || e.target.classList.contains("scrim")) closeLog(); });
+  $("btnConfirm").addEventListener("click", function () {
+    var done = function () {
+      window.location.replace("index.html");
+    };
+    var localClear = function () {
+      try { if (typeof Rconf !== "undefined") Rconf.session.clear(); } catch (e) {}
+      done();
+    };
+    if (window.RconfApi) RconfApi.logout().then(localClear).catch(localClear);
+    else localClear();
+  });
+
+  /* ---------- ripple / gestos (padrão das telas) ---------- */
+  Array.prototype.forEach.call(document.querySelectorAll(".btn"), function (b) {
+    b.addEventListener("pointerdown", function (e) {
+      var rc = b.getBoundingClientRect(), s = document.createElement("span");
+      s.className = "ripple";
+      s.style.left = (e.clientX - rc.left) + "px"; s.style.top = (e.clientY - rc.top) + "px";
+      b.appendChild(s);
+      s.addEventListener("animationend", function () { s.remove(); });
+    });
+  });
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+
+  loaderEl.classList.add("hide");
+  setTimeout(function () { loaderEl.style.display = "none"; }, 600);
+})();
+</script>
+</body>
+</html>

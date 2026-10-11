@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#070b14">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Conferência · RAMSONS</title>
+<link rel="stylesheet" href="rconf-ui.css">
+</head>
+<body>
+
+<div class="glow" aria-hidden="true"></div>
+
+<div class="screen">
+  <header class="app-header">
+    <button type="button" class="back" id="back" aria-label="Voltar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+    </button>
+    <div class="mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#ff7a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+    </div>
+    <div class="brand"><h1>RAM<span>SONS</span></h1><h2>Conferência</h2></div>
+  </header>
+
+  <div class="content">
+    <div class="wrap">
+      <div class="progress" id="progress">
+        <div class="plabel"><span id="pText"><b>0</b> / 0 conferidos</span><span id="pPct">0%</span></div>
+        <div class="ptrack"><div class="pfill" id="pFill"></div></div>
+      </div>
+
+      <div class="searchbar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" id="search" placeholder="Buscar código ou descrição..." autocomplete="off" autocapitalize="characters" spellcheck="false">
+        <button type="button" class="clear" id="clear" aria-label="Limpar">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="chips" id="chips">
+        <button type="button" class="chip active" data-filtro="todos">Todos <span class="n" id="nTodos"></span></button>
+        <button type="button" class="chip" data-filtro="pendentes">Pendentes <span class="n" id="nPend"></span></button>
+        <button type="button" class="chip" data-filtro="conferidos">Conferidos <span class="n" id="nConf"></span></button>
+      </div>
+
+      <div class="plist" id="list"></div>
+      <div class="empty" id="empty" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <p id="emptyMsg">Nenhum produto encontrado.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <button type="button" class="btn btn-primary" id="finalizar" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <span id="finLbl">Finalizar Conferência</span>
+    </button>
+  </div>
+</div>
+
+<!-- hoja para conferir um produto -->
+<div class="overlay" id="overlay">
+  <div class="scrim" id="scrim"></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <div class="s-code" id="cCode"></div>
+    <div class="s-desc" id="cDesc"></div>
+    <div class="s-expected">Quantidade esperada: <b id="cEsp">0</b></div>
+    <div class="qty">
+      <button type="button" id="minus" aria-label="Diminuir">−</button>
+      <input type="number" id="qtd" inputmode="numeric" min="0" step="1" value="0">
+      <button type="button" id="plus" aria-label="Aumentar">+</button>
+    </div>
+    <p class="s-hint" id="cHint">Ajuste a quantidade encontrada.</p>
+    <div class="s-actions">
+      <button type="button" class="btn btn-primary" id="confirmar">Confirmar</button>
+      <button type="button" class="btn btn-ghost" id="cancelar">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<div class="loader" id="loader">
+  <div class="l-mark">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#ff7a1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+  </div>
+  <p>Ramsons</p>
+</div>
+
+<script src="rconf-store.js"></script>
+<script src="rconf-flow.js"></script>
+<script src="rconf-api.js"></script>
+<script>
+(function () {
+  "use strict";
+  var user = (typeof Rconf !== "undefined") ? Rconf.session.user() : null;
+  if (!user) { window.location.replace("index.html"); return; }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var toastEl = $("toast"), loaderEl = $("loader");
+
+  var toastTimer;
+  function showToast(msg, kind) {
+    toastEl.textContent = msg;
+    toastEl.classList.remove("err", "ok");
+    if (kind) toastEl.classList.add(kind);
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 2000);
+  }
+
+  function mirror(c) { try { Rconf.conf.save(user, c); } catch (e) {} }
+
+  /* ==================================================================
+     boot: toda a tela, agora com a conferência vinda do SERVIDOR
+     (com fallback local de rconf-store.js quando não há API).
+     ================================================================== */
+  function boot(conf) {
+    if (!conf) { window.location.replace("nova-conferencia.html"); return; }
+    mirror(conf);
+
+    var estado = { filtro: "todos", query: "" };
+    var atual = null;   // produto aberto na folha
+
+    /* ---------- render ---------- */
+    function renderProgresso() {
+      var pr = RconfFlow.progress(conf.produtos);
+      $("pText").innerHTML = "<b>" + RconfFlow.formatInt(pr.conferidos) + "</b> / " + RconfFlow.formatInt(pr.total) + " conferidos";
+      $("pPct").textContent = pr.pct + "%";
+      $("pFill").style.width = pr.pct + "%";
+      $("progress").classList.toggle("done", pr.done);
+      $("nTodos").textContent = pr.total;
+      $("nPend").textContent = pr.faltando;
+      $("nConf").textContent = pr.conferidos;
+      var btn = $("finalizar");
+      btn.disabled = !pr.done;
+      $("finLbl").textContent = pr.done ? "Finalizar Conferência" : "Finalizar (" + pr.faltando + " pendentes)";
+    }
+
+    function renderLista() {
+      var lista = RconfFlow.filterList(conf.produtos, estado);
+      var box = $("list");
+      box.innerHTML = "";
+      var frag = document.createDocumentFragment();
+      for (var i = 0; i < lista.length; i++) {
+        var p = lista[i];
+        var el = document.createElement("div");
+        el.className = "pitem" + (p.status === "conferido" ? " is-conf" : "");
+        el.setAttribute("data-codigo", p.codigo);
+        el.innerHTML =
+          '<div class="pbody">' +
+            '<div class="pcode">' + escapar(p.codigo) + '</div>' +
+            '<div class="pdesc">' + (escapar(p.descricao) || "<span style='color:#6f7c93'>Sem descrição</span>") + '</div>' +
+            '<div class="pmeta">Esperado: <b>' + RconfFlow.formatInt(p.esperado) + '</b>' +
+              (p.status === "conferido" ? ' · Conferido: <b>' + RconfFlow.formatInt(p.conferido) + '</b>' : '') +
+            '</div>' +
+          '</div>' +
+          '<div class="pstate">' +
+            '<span class="badge ' + (p.status === "conferido" ? "conf" : "pend") + '">' + (p.status === "conferido" ? "Conferido" : "Pendente") + '</span>' +
+            (p.status === "conferido"
+              ? '<svg class="done-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
+              : '') +
+          '</div>';
+        frag.appendChild(el);
+      }
+      box.appendChild(frag);
+      var empty = $("empty");
+      if (lista.length === 0) {
+        empty.hidden = false;
+        $("emptyMsg").textContent = estado.query
+          ? 'Nenhum produto corresponde a "' + estado.query + '".'
+          : (estado.filtro === "pendentes" ? "Todos os produtos já foram conferidos." : "Nada por aqui ainda.");
+      } else { empty.hidden = true; }
+    }
+
+    function escapar(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+    function refrescar() { renderProgresso(); renderLista(); }
+
+    /* ---------- busca ---------- */
+    $("search").addEventListener("input", function () {
+      estado.query = this.value;
+      $("clear").classList.toggle("show", !!this.value);
+      renderLista();
+    });
+    $("clear").addEventListener("click", function () {
+      $("search").value = ""; estado.query = ""; $("clear").classList.remove("show");
+      renderLista(); $("search").focus();
+    });
+
+    /* ---------- filtros ---------- */
+    Array.prototype.forEach.call($("chips").querySelectorAll(".chip"), function (c) {
+      c.addEventListener("click", function () {
+        Array.prototype.forEach.call($("chips").querySelectorAll(".chip"), function (x) { x.classList.remove("active"); });
+        c.classList.add("active");
+        estado.filtro = c.getAttribute("data-filtro");
+        renderLista();
+      });
+    });
+
+    /* ---------- abrir produto ---------- */
+    $("list").addEventListener("click", function (e) {
+      var item = e.target.closest ? e.target.closest(".pitem") : null;
+      if (!item) return;
+      var codigo = item.getAttribute("data-codigo");
+      for (var i = 0; i < conf.produtos.length; i++) {
+        if (String(conf.produtos[i].codigo) === codigo) { abrir(conf.produtos[i]); break; }
+      }
+    });
+
+    function abrir(p) {
+      atual = p;
+      $("cCode").textContent = "CÓDIGO " + p.codigo;
+      $("cDesc").textContent = p.descricao || "Sem descrição";
+      $("cEsp").textContent = RconfFlow.formatInt(p.esperado);
+      $("qtd").value = p.status === "conferido" ? p.conferido : p.esperado;
+      $("cHint").textContent = p.status === "conferido" ? "Produto já conferido — edite se precisar." : "Ajuste a quantidade encontrada.";
+      $("overlay").classList.add("show");
+    }
+    function fechar() { $("overlay").classList.remove("show"); atual = null; }
+
+    $("scrim").addEventListener("click", fechar);
+    $("cancelar").addEventListener("click", fechar);
+
+    function qtdAtual() { return RconfFlow.clampQty($("qtd").value); }
+    function setQtd(n) { $("qtd").value = RconfFlow.clampQty(n); }
+    $("minus").addEventListener("click", function () { setQtd(qtdAtual() - 1); });
+    $("plus").addEventListener("click", function () { setQtd(qtdAtual() + 1); });
+    $("qtd").addEventListener("input", function () { this.value = String(this.value).replace(/[^0-9]/g, ""); });
+
+    $("confirmar").addEventListener("click", function () {
+      if (!atual) return;
+      var q = qtdAtual();
+      if (window.RconfApi) {                         // guarda imediatamente no servidor
+        RconfApi.confSetProduto(atual.codigo, q, conf.id).catch(function () {});
+      }
+      conf = Rconf.confs.setProduto(user, atual.codigo, q, conf.id) || conf;   // espelho local
+      var p = null;
+      for (var i = 0; i < conf.produtos.length; i++) if (String(conf.produtos[i].codigo) === String(atual.codigo)) { p = conf.produtos[i]; break; }
+      fechar();
+      refrescar();
+      var pr = RconfFlow.progress(conf.produtos);
+      if (pr.done) showToast("Tudo conferido! Finalize quando quiser.", "ok");
+      else showToast("Conferido: " + (p ? p.codigo : "") + " (" + RconfFlow.formatInt(q) + ")", "ok");
+    });
+
+    /* ---------- finalizar ---------- */
+    $("finalizar").addEventListener("click", function () {
+      var pr = RconfFlow.progress(conf.produtos);
+      if (!pr.done) { showToast("Ainda faltam " + pr.faltando + " produtos.", "err"); return; }
+      if (window.RconfApi) {                         // servidor move para o histórico e limpa
+        RconfApi.confFinish(conf.id).then(function (d) {
+          var fin = d && d.conferencia;
+          try { Rconf.confs.clear(user, conf.id); } catch (e) {}
+          window.location.href = "resumo.html?id=" + encodeURIComponent(fin ? fin.id : conf.id);
+        }).catch(function () {
+          var fin = Rconf.confs.finish(user, conf.id);
+          window.location.href = "resumo.html?id=" + encodeURIComponent(fin ? fin.id : conf.id);
+        });
+        return;
+      }
+      var fin = Rconf.confs.finish(user, conf.id);   // move para historial e limpa conferenciaAtual
+      if (!fin) { showToast("Não foi possível finalizar.", "err"); return; }
+      window.location.href = "resumo.html?id=" + encodeURIComponent(fin.id);
+    });
+
+    /* ---------- voltar ---------- */
+    $("back").addEventListener("click", function () { window.location.href = "home.html"; });
+
+    /* ---------- ripple (só botões .btn) ---------- */
+    Array.prototype.forEach.call(document.querySelectorAll(".btn"), function (b) {
+      b.addEventListener("pointerdown", function (e) {
+        var r = b.getBoundingClientRect(), s = document.createElement("span");
+        s.className = "ripple";
+        s.style.left = (e.clientX - r.left) + "px"; s.style.top = (e.clientY - r.top) + "px";
+        b.appendChild(s);
+        s.addEventListener("animationend", function () { s.remove(); });
+      });
+    });
+    document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
+
+    refrescar();
+    loaderEl.classList.add("hide");
+    setTimeout(function () { loaderEl.style.display = "none"; }, 700);
+  }
+
+  /* ---------- entrada: servidor primeiro ----------
+     Para continuar conferências específicas, aceita ?id=<id> (confere só essa).
+     Sem id, usa "conferência atual" (a mais recente). Se o servidor NÃO tem a
+     conferência, NUNCA importamos automaticamente dados locais de outra conta.
+     Uma cópia local da MESMA conta é recuperada EXPLICITAMENTE na tela "Nova
+     Conferência" (card de retomada); aqui apenas redirecionamos. Sem API,
+     usamos o cache local da conta autenticada (identificada por ID). */
+  function idFromUrl() {
+    var m = /[?&]id=([^&]*)/.exec(window.location.search || "");
+    return m ? decodeURIComponent(m[1]) : "";
+  }
+
+  var qid = idFromUrl();
+  function bootLocal(qid2) {
+    var lo = null;
+    try { lo = qid2 ? Rconf.confs.get(user, qid2) : Rconf.conf.get(user); } catch (e) {}
+    boot(lo);
+  }
+
+  if (window.RconfApi) {
+    var p = qid ? RconfApi.confGetId(qid) : RconfApi.confGet();
+    p.then(function (d) {
+      var conf = d && d.conferencia;
+      if (conf) { boot(conf); return; }
+      if (qid) { bootLocal(qid); return; }   // sem servidor: continua a cópia local da MESMA conta?
+      window.location.replace("nova-conferencia.html");
+    }).catch(function () {
+      if (qid && RconfApi.histGet) {
+        RconfApi.histGet(qid).then(function (hd) {
+          if (hd && hd.conferencia) window.location.replace("resumo.html?id=" + encodeURIComponent(qid));  // já finalizada
+          else bootLocal(qid);
+        }).catch(function () { bootLocal(qid); });
+        return;
+      }
+      bootLocal(qid);
+    });
+  } else {
+    bootLocal(qid);
+  }
+})();
+</script>
+</body>
+</html>
