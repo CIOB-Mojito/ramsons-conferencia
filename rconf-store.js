@@ -44,9 +44,12 @@
   var K_PREFIX = "rconf_data_";
   var VERSION = 1;
 
+  /* Sem PINs no cliente: a autenticação é SEMPRE feita pelo servidor.
+     Mantemos apenas nome/perfil para compatibilidade das rotinas locais
+     (isKnown/seedId). Nenhuma credencial é exposta aqui. */
   var USERS = [
-    { user: "Ismael", pin: "1234", role: "ADM" },
-    { user: "Anderson", pin: "1234", role: "USUARIO" }
+    { user: "Ismael", role: "ADM" },
+    { user: "Anderson", role: "USUARIO" }
   ];
 
   /* ID determinístico usado pelas contas iniciais no modo demo/offline.
@@ -140,12 +143,8 @@
     VERSION: VERSION,
     USERS: USERS,
 
-    auth: function (user, pin) {
-      for (var i = 0; i < USERS.length; i++) {
-        if (USERS[i].user === user && USERS[i].pin === pin) return true;
-      }
-      return false;
-    },
+    /* Sem autenticação no cliente: a decisão é SEMPRE do servidor. */
+    auth: function () { return false; },
 
     session: {
       user: function () {
@@ -219,7 +218,15 @@
     listOpenLocal: function (user) {
       if (!isKnown(user)) return [];
       var d = Rconf.data.get(user);
-      return Object.prototype.toString.call(d.conferencias) === "[object Array]" ? d.conferencias : [];
+      var list = Object.prototype.toString.call(d.conferencias) === "[object Array]" ? d.conferencias : [];
+      var seen = {}, out = [];
+      for (var i = 0; i < list.length; i++) {
+        var c = list[i];
+        if (!c || typeof c !== "object" || !c.id || seen[c.id]) continue; // nunca duplica na leitura
+        seen[c.id] = true;
+        out.push(c);
+      }
+      return out;
     },
     getOpenLocal: function (user, id) {
       var l = Rconf.listOpenLocal(user);
@@ -242,6 +249,58 @@
       if (!isKnown(user)) return null;
       var d = Rconf.data.get(user);
       return d.conferenciaAtual && typeof d.conferenciaAtual === "object" ? d.conferenciaAtual : null;
+    },
+
+    /* ---------- alterações pendentes de sincronização ----------
+       Quando a API falha ao gravar uma contagem, a intenção é guardada aqui
+       (persistida por conta) para ser reenviada depois. NUNCA é descartada
+       silenciosamente e nunca é anunciada como sincronizada. */
+    pending: {
+      key: function (user) {
+        var id = currentAccountId();
+        if (!id) return null;                 // sem identidade: sem fila persistente
+        return "rconf_pending_" + id;
+      },
+      list: function (user) {
+        var k = Rconf.pending.key(user);
+        if (!k) return [];
+        var arr = parse(readRaw(k));
+        return Object.prototype.toString.call(arr) === "[object Array]" ? arr : [];
+      },
+      save: function (user, arr) {
+        var k = Rconf.pending.key(user);
+        if (!k) return false;
+        return writeRaw(k, JSON.stringify(arr));
+      },
+      /* registra/atualiza a intenção de contagem (dedup por conferência+código) */
+      add: function (user, item) {
+        if (!item || !item.confId || item.codigo == null) return false;
+        var arr = Rconf.pending.list(user);
+        var cod = String(item.codigo);
+        var found = false;
+        for (var i = 0; i < arr.length; i++) {
+          if (arr[i] && arr[i].confId === item.confId && String(arr[i].codigo) === cod) {
+            arr[i].conferido = item.conferido; arr[i].at = Date.now();
+            found = true; break;
+          }
+        }
+        if (!found) arr.push({ confId: item.confId, codigo: cod, conferido: item.conferido, at: Date.now() });
+        return Rconf.pending.save(user, arr);
+      },
+      remove: function (user, confId, codigo) {
+        var arr = Rconf.pending.list(user).filter(function (x) {
+          return !(x && x.confId === confId && String(x.codigo) === String(codigo));
+        });
+        return Rconf.pending.save(user, arr);
+      },
+      forConf: function (user, confId) {
+        return Rconf.pending.list(user).filter(function (x) { return x && x.confId === confId; });
+      },
+      clearConf: function (user, confId) {
+        var arr = Rconf.pending.list(user).filter(function (x) { return !(x && x.confId === confId); });
+        return Rconf.pending.save(user, arr);
+      },
+      count: function (user) { return Rconf.pending.list(user).length; }
     },
 
     confs: {

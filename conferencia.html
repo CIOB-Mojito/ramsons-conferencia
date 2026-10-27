@@ -35,7 +35,7 @@
 
       <div class="searchbar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input type="text" id="search" placeholder="Buscar código ou descrição..." autocomplete="off" autocapitalize="characters" spellcheck="false">
+        <input type="text" id="search" placeholder="Buscar código ou descrição..." autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false">
         <button type="button" class="clear" id="clear" aria-label="Limpar">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
         </button>
@@ -121,9 +121,22 @@
      boot: toda a tela, agora com a conferência vinda do SERVIDOR
      (com fallback local de rconf-store.js quando não há API).
      ================================================================== */
-  function boot(conf) {
+  function boot(conf, fromLocal) {
     if (!conf) { window.location.replace("nova-conferencia.html"); return; }
+    // modoLocal: sem servidor (ou conferência só existe localmente). Nesse caso
+    // finalizar localmente é legítimo. Se a conferência veio DO servidor, ela
+    // NUNCA pode ser dada como finalizada localmente (ficaria aberta lá).
+    var modoLocal = !!fromLocal;
     mirror(conf);
+
+    /* Alterações guardadas localmente quando a API falhou: reaplicar sobre a
+       conferência do servidor para NÃO perder contagens não sincronizadas. */
+    if (Rconf.pending && RconfFlow.applyPending) {
+      try {
+        var pend = Rconf.pending.forConf(user, conf.id);
+        if (pend.length) { conf.produtos = RconfFlow.applyPending(conf.produtos, pend); mirror(conf); }
+      } catch (e) {}
+    }
 
     var estado = { filtro: "todos", query: "" };
     var atual = null;   // produto aberto na folha
@@ -183,6 +196,22 @@
 
     function refrescar() { renderProgresso(); renderLista(); }
 
+    /* Reenvia ao servidor as alterações pendentes DESTA conferência.
+       Devolve a quantidade que AINDA ficou pendente (0 = tudo sincronizado). */
+    function flushPending() {
+      if (!window.RconfApi || !Rconf.pending) return Promise.resolve(0);
+      var items = Rconf.pending.forConf(user, conf.id);
+      var idx = 0;
+      function next() {
+        if (idx >= items.length) return Promise.resolve(Rconf.pending.forConf(user, conf.id).length);
+        var it = items[idx++];
+        return RconfApi.confSetProduto(it.codigo, it.conferido, conf.id)
+          .then(function () { try { Rconf.pending.remove(user, conf.id, it.codigo); } catch (e) {} return next(); })
+          .catch(function () { return next(); });   // mantém na fila para nova tentativa
+      }
+      return next();
+    }
+
     /* ---------- busca ---------- */
     $("search").addEventListener("input", function () {
       estado.query = this.value;
@@ -237,37 +266,75 @@
     $("confirmar").addEventListener("click", function () {
       if (!atual) return;
       var q = qtdAtual();
-      if (window.RconfApi) {                         // guarda imediatamente no servidor
-        RconfApi.confSetProduto(atual.codigo, q, conf.id).catch(function () {});
-      }
-      conf = Rconf.confs.setProduto(user, atual.codigo, q, conf.id) || conf;   // espelho local
+      var codigo = atual.codigo;
+      // 1) registra a intenção ANTES de tocar na rede: nunca se perde a contagem
+      if (Rconf.pending) { try { Rconf.pending.add(user, { confId: conf.id, codigo: codigo, conferido: q }); } catch (e) {} }
+      // 2) espelho local: resposta imediata na tela (mesma conta)
+      conf = Rconf.confs.setProduto(user, codigo, q, conf.id) || conf;
       var p = null;
-      for (var i = 0; i < conf.produtos.length; i++) if (String(conf.produtos[i].codigo) === String(atual.codigo)) { p = conf.produtos[i]; break; }
+      for (var i = 0; i < conf.produtos.length; i++) if (String(conf.produtos[i].codigo) === String(codigo)) { p = conf.produtos[i]; break; }
       fechar();
       refrescar();
       var pr = RconfFlow.progress(conf.produtos);
       if (pr.done) showToast("Tudo conferido! Finalize quando quiser.", "ok");
       else showToast("Conferido: " + (p ? p.codigo : "") + " (" + RconfFlow.formatInt(q) + ")", "ok");
+      // 3) tenta enviar; se falhar, NÃO esconde o erro e mantém pendente
+      if (window.RconfApi) {
+        flushPending().then(function (restam) {
+          if (restam > 0) showToast("Sem conexão com o servidor: " + restam + " alteração(ões) guardada(s) neste aparelho.", "err");
+        });
+      }
     });
 
     /* ---------- finalizar ---------- */
+    /* Só limpa o local DEPOIS que o servidor confirma (evita ficar finalizada
+       localmente e aberta no servidor, ou vice-versa). */
+    function finalizarConcluido(fin) {
+      try { if (Rconf.pending) Rconf.pending.clearConf(user, conf.id); } catch (e) {}
+      try { Rconf.confs.clear(user, conf.id); } catch (e) {}
+      window.location.href = "resumo.html?id=" + encodeURIComponent((fin && fin.id) || conf.id);
+    }
+
+    /* Um erro de rede pode esconder um finalize que o servidor JÁ concluiu
+       (timeout). Confirmamos no histórico antes de anunciar falha. */
+    function reconciliarFinalizacao(btn, err) {
+      var p = RconfApi.histGet ? RconfApi.histGet(conf.id) : Promise.reject(err);
+      p.then(function (hd) {
+        if (hd && hd.conferencia) { finalizarConcluido(hd.conferencia); return; }
+        if (btn) btn.disabled = false;
+        showToast("Não foi possível finalizar no servidor. A conferência continua aberta.", "err");
+      }).catch(function () {
+        if (btn) btn.disabled = false;
+        showToast("Não foi possível finalizar no servidor. A conferência continua aberta.", "err");
+      });
+    }
+
     $("finalizar").addEventListener("click", function () {
       var pr = RconfFlow.progress(conf.produtos);
       if (!pr.done) { showToast("Ainda faltam " + pr.faltando + " produtos.", "err"); return; }
-      if (window.RconfApi) {                         // servidor move para o histórico e limpa
-        RconfApi.confFinish(conf.id).then(function (d) {
-          var fin = d && d.conferencia;
-          try { Rconf.confs.clear(user, conf.id); } catch (e) {}
-          window.location.href = "resumo.html?id=" + encodeURIComponent(fin ? fin.id : conf.id);
-        }).catch(function () {
-          var fin = Rconf.confs.finish(user, conf.id);
-          window.location.href = "resumo.html?id=" + encodeURIComponent(fin ? fin.id : conf.id);
-        });
+      if (!window.RconfApi || modoLocal) {           // offline de verdade: finaliza local
+        var fin = Rconf.confs.finish(user, conf.id);
+        if (!fin) { showToast("Não foi possível finalizar.", "err"); return; }
+        try { if (Rconf.pending) Rconf.pending.clearConf(user, conf.id); } catch (e) {}
+        window.location.href = "resumo.html?id=" + encodeURIComponent(fin.id);
         return;
       }
-      var fin = Rconf.confs.finish(user, conf.id);   // move para historial e limpa conferenciaAtual
-      if (!fin) { showToast("Não foi possível finalizar.", "err"); return; }
-      window.location.href = "resumo.html?id=" + encodeURIComponent(fin.id);
+      var btn = $("finalizar");
+      if (btn.disabled) return;
+      btn.disabled = true;
+      // 1) sincroniza pendências ANTES de finalizar (nunca finalizar com contagem só local)
+      flushPending().then(function (restam) {
+        if (restam > 0) {
+          btn.disabled = false;
+          showToast("Há alterações não sincronizadas. Verifique a conexão e tente novamente.", "err");
+          return;
+        }
+        RconfApi.confFinish(conf.id).then(function (d) {
+          finalizarConcluido(d && d.conferencia);
+        }).catch(function (err) {
+          reconciliarFinalizacao(btn, err);
+        });
+      });
     });
 
     /* ---------- voltar ---------- */
@@ -286,6 +353,13 @@
     document.addEventListener("gesturestart", function (e) { e.preventDefault(); });
 
     refrescar();
+    // tenta reenviar o que ficou pendente de sessões anteriores (se falhar,
+    // mantém na fila e avisa — nunca finge que sincronizou)
+    if (window.RconfApi && Rconf.pending && Rconf.pending.forConf(user, conf.id).length) {
+      flushPending().then(function (restam) {
+        if (restam > 0) showToast("Há " + restam + " alteração(ões) ainda não sincronizada(s).", "err");
+      });
+    }
     loaderEl.classList.add("hide");
     setTimeout(function () { loaderEl.style.display = "none"; }, 700);
   }
@@ -305,8 +379,8 @@
   var qid = idFromUrl();
   function bootLocal(qid2) {
     var lo = null;
-    try { lo = qid2 ? Rconf.confs.get(user, qid2) : Rconf.conf.get(user); } catch (e) {}
-    boot(lo);
+    try { lo = Rconf.confs.get(user, qid2) || Rconf.conf.get(user); } catch (e) {}
+    boot(lo, true);   // veio do cache local: finalizar localmente é permitido
   }
 
   if (window.RconfApi) {

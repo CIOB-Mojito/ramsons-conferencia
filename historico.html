@@ -10,6 +10,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Histórico · RAMSONS</title>
 <link rel="stylesheet" href="rconf-ui.css">
+<style>
+  .sheet .s-title{text-align:center;font-size:17px;font-weight:800;line-height:1.35;}
+  .sheet .s-actions{display:flex;flex-direction:column;gap:10px;}
+</style>
 </head>
 <body>
 
@@ -36,6 +40,20 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l3 2"/></svg>
         <p>Nenhuma conferência ainda.</p>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmação de exclusão -->
+<div class="overlay" id="delBox" aria-hidden="true">
+  <div class="scrim"></div>
+  <div class="sheet">
+    <div class="grab" aria-hidden="true"></div>
+    <p class="s-title">Eliminar conferência</p>
+    <p class="s-hint" id="delHint"></p>
+    <div class="s-actions">
+      <button type="button" class="btn btn-ghost" id="delCancel">Cancelar</button>
+      <button type="button" class="btn btn-danger" id="delConfirm">Eliminar</button>
     </div>
   </div>
 </div>
@@ -78,27 +96,72 @@
 
   function cancelLongPress() { clearTimeout(lpTimer); lpTimer = null; lpStart = null; }
 
-  /* mantido pressionado -> confirma e remove SÓ aquela conferência (pelo id) */
+  /* ---------- modal de confirmação (substitui o confirm nativo) ---------- */
+  var delBox = $("delBox");
+  var delInfo = null;   // { id, tipo, arquivo } aguardando confirmação
+
+  function abrirRemocao(id, tipo, arquivo) {
+    delInfo = { id: id, tipo: tipo, arquivo: arquivo };
+    var nome = arquivo || "conferência";
+    $("delHint").textContent = (tipo === "aberta"
+      ? 'A conferência "' + nome + '" está em andamento e será descartada. '
+      : 'A conferência "' + nome + '" será removida. ') + "Esta ação não pode ser desfeita.";
+    delBox.classList.add("show");
+    delBox.setAttribute("aria-hidden", "false");
+  }
+  function fecharRemocao() {
+    delInfo = null;   // cancelar NÃO toca em nenhum dado
+    delBox.classList.remove("show");
+    delBox.setAttribute("aria-hidden", "true");
+  }
+  $("delCancel").addEventListener("click", fecharRemocao);
+  delBox.addEventListener("click", function (e) {
+    if (e.target === delBox || (e.target && e.target.classList && e.target.classList.contains("scrim"))) fecharRemocao();
+  });
+  $("delConfirm").addEventListener("click", function () {
+    var info = delInfo;
+    fecharRemocao();
+    if (info) remover(info.id, info.tipo, info.arquivo);   // fluxo de exclusão existente
+  });
+
+  /* mantido pressionado -> pede confirmação e remove SÓ aquela conferência (pelo id) */
   function pedirRemocao(item) {
     var id = item.getAttribute("data-id");
     var tipo = item.getAttribute("data-tipo");
     if (!id) return;
-    var nome = item.getAttribute("data-arquivo") || "conferência";
-    var detalhe = tipo === "aberta"
-      ? "\n\nEsta conferência está EM ANDAMENTO e será descartada."
-      : "\n\nEsta ação não pode ser desfeita.";
-    if (!window.confirm('Remover a conferência "' + nome + '"?\nID: ' + id + detalhe)) return;
-    remover(id, tipo);
+    abrirRemocao(id, tipo, item.getAttribute("data-arquivo"));
   }
 
-  function remover(id, tipo) {
+  /* Remove as cópias LOCAIS da MESMA conferência (por id). Cópias antigas
+     gravadas com um id local próprio (diferente do id do servidor) são
+     identificadas pelo arquivo e removidas apenas quando o servidor não as
+     conhece (nem abertas nem no histórico) — outras conferências ficam
+     intactas. */
+  function limparLocal(id, arquivo, conhecidos) {
+    try { if (Rconf.confs && Rconf.confs.remove) Rconf.confs.remove(user, id); } catch (e) {}
+    try { if (Rconf.historial && Rconf.historial.remove) Rconf.historial.remove(user, id); } catch (e) {}
+    try { if (Rconf.pending && Rconf.pending.clearConf) Rconf.pending.clearConf(user, id); } catch (e) {}
+    if (!arquivo || !Rconf.confs || !Rconf.confs.list) return;
+    var locais = Rconf.confs.list(user) || [];
+    for (var i = 0; i < locais.length; i++) {
+      var c = locais[i];
+      if (!c || c.id === id || c.arquivo !== arquivo) continue;
+      if (conhecidos && conhecidos[c.id]) continue;   // o servidor a conhece: não tocar
+      try { Rconf.confs.remove(user, c.id); } catch (e) {}
+      try { if (Rconf.pending && Rconf.pending.clearConf) Rconf.pending.clearConf(user, c.id); } catch (e) {}
+    }
+  }
+
+  var podaPendente = null;   // { id, arquivo } -> reconciliar depois de listar o servidor
+  function remover(id, tipo, arquivo) {
     var fn = window.RconfApi ? (tipo === "aberta" ? RconfApi.confDelete : RconfApi.histDelete) : null;
     if (fn) {
       fn(id).then(function () {
+        podaPendente = { id: id, arquivo: arquivo };
         showToast("Conferência removida", true);
         reload();
       }).catch(function (err) {
-        if (err && err.status === 404) { showToast("Esta conferência já não existe", true); reload(); return; }
+        if (err && err.status === 404) { podaPendente = { id: id, arquivo: arquivo }; showToast("Esta conferência já não existe", true); reload(); return; }
         showToast("Não foi possível remover a conferência", false);
       });
       return;
@@ -108,6 +171,7 @@
       if (tipo === "aberta") ok = !!(Rconf.confs && Rconf.confs.remove && Rconf.confs.remove(user, id));
       else ok = !!(Rconf.historial && Rconf.historial.remove && Rconf.historial.remove(user, id));
     } catch (e) { ok = false; }
+    limparLocal(id, null, null);   // offline: remove só por id (não arrisca outras do mesmo arquivo)
     showToast(ok ? "Conferência removida" : "Esta conferência já não existe", true);
     reload();
   }
@@ -155,7 +219,7 @@
       el.className = "hitem";
       el.setAttribute("data-id", conf.id);
       el.setAttribute("data-tipo", aberta ? "aberta" : "finalizada");
-      el.setAttribute("data-arquivo", conf.arquivo || "conferência");
+      el.setAttribute("data-arquivo", conf.arquivo || "");
       el.innerHTML =
         '<div class="hic">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>' +
@@ -175,7 +239,17 @@
     if(window.RconfApi){
       var openP=RconfApi.confList()||Promise.resolve({conferencias:[]});
       var doneP=RconfApi.histList()||Promise.resolve({historico:[]});
-      Promise.all([openP,doneP]).then(function(r){render((r[0]&&r[0].conferencias)||[],(r[1]&&r[1].historico)||[]);}).catch(function(){render(Rconf.confs?Rconf.confs.list(user):[],Rconf.historial?Rconf.historial.list(user):[]);});
+      Promise.all([openP,doneP]).then(function(r){
+        var abertas=(r[0]&&r[0].conferencias)||[], feitas=(r[1]&&r[1].historico)||[];
+        if(podaPendente){
+          var conhecidos={};
+          for(var i=0;i<abertas.length;i++) if(abertas[i]&&abertas[i].id) conhecidos[abertas[i].id]=1;
+          for(var j=0;j<feitas.length;j++){ var h=feitas[j]; if(h&&h.id) conhecidos[h.id]=1; }
+          limparLocal(podaPendente.id,podaPendente.arquivo,conhecidos);
+          podaPendente=null;
+        }
+        render(abertas,feitas);
+      }).catch(function(){render(Rconf.confs?Rconf.confs.list(user):[],Rconf.historial?Rconf.historial.list(user):[]);});
     }else{render(Rconf.confs?Rconf.confs.list(user):[],Rconf.historial?Rconf.historial.list(user):[]);}
   }
 

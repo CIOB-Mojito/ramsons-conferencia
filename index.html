@@ -252,17 +252,12 @@
   "use strict";
 
   /* =====================================================================
-     AUTENTICAÇÃO
-     1) Tenta POST /api/login  { usuario, pin }  ->  { ok: true }
-        (401/403 ou { ok:false } = credenciais inválidas)
-     2) Se a API não existir ainda, cai no modo DEMO abaixo.
-        >>> REMOVA o modo DEMO quando o /api/login estiver pronto. <<<
+     AUTENTICAÇÃO — SEMPRE no servidor (POST /api/login).
+     Não existe modo DEMO no cliente: um erro HTTP, uma resposta inválida
+     ou um servidor inacessível NUNCA autenticam. A decisão é sempre do
+     servidor; o cliente apenas interpreta a resposta.
      ===================================================================== */
-  var DEMO_USERS = (typeof Rconf !== "undefined" && Rconf.USERS) ? Rconf.USERS : [
-    { user: "Ismael", pin: "1234" },
-    { user: "Anderson", pin: "1234" }
-  ];
-
+  /* RC-AUTH-START */
   function authenticate(u, p) {
     return fetch("/api/login", {
       method: "POST",
@@ -270,18 +265,21 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ usuario: u, pin: p })
     }).then(function (r) {
-      if (r.status === 401 || r.status === 403) return { ok: false };
-      if (!r.ok) throw new Error("sem api");
+      if (r.status === 401 || r.status === 403) return { ok: false, reason: "credentials" };
+      if (r.status === 429) return { ok: false, reason: "locked" };
+      if (!r.ok) return { ok: false, reason: "server" };
       return r.json().then(function (d) {
         if (d && (d.ok === true || d.token)) return { ok: true, id: d.id || null };
-        if (d && d.ok === false) return { ok: false };
-        throw new Error("resposta inesperada");
+        return { ok: false, reason: "invalid" };
+      }, function () {
+        return { ok: false, reason: "invalid" };
       });
-    }).catch(function () {
-      var demo = DEMO_USERS.some(function (c) { return c.user === u && c.pin === p; });
-      return { ok: demo, id: null };   // demo/offline: identidade local via seedId
+    }, function () {
+      /* fetch rejeitado = servidor inacessível: NÃO autentica. */
+      return { ok: false, reason: "offline" };
     });
   }
+  /* RC-AUTH-END */
 
   /* ---------- Utilidades ---------- */
   var $ = function (id) { return document.getElementById(id); };
@@ -666,22 +664,26 @@
     if (!p) { setErr("Informe o PIN", "fPass"); passEl.focus(); return; }
     setErr("");
     setBusy(true);
-    var t0 = Date.now();
     authenticate(u, p).then(function (res) {
-      setTimeout(function () {
-        if (res.ok) {
-          lsSet(remEl.checked ? u : "");
-          try { if (typeof Rconf !== "undefined") Rconf.session.set({ user: u, id: res.id || null }); } catch (e) {}
-          blurInputs();
-          loginEl.classList.remove("on");
-          setTimeout(function () { window.location.href = "home.html"; }, reduce ? 60 : 400);
-        } else {
-          setBusy(false);
-          passEl.value = "";
-          setErr("Usuário ou PIN inválidos", "fPass");
-          passEl.focus();
-        }
-      }, Math.max(0, 700 - (Date.now() - t0)));
+      if (res && res.ok) {
+        lsSet(remEl.checked ? u : "");
+        try { if (typeof Rconf !== "undefined") Rconf.session.set({ user: u, id: res.id || null }); } catch (e) {}
+        blurInputs();
+        loginEl.classList.remove("on");
+        setTimeout(function () { window.location.href = "home.html"; }, reduce ? 60 : 400);
+        return;
+      }
+      setBusy(false);
+      passEl.value = "";
+      var msg = "Usuário ou PIN inválidos";
+      var field = "fPass";
+      var reason = res && res.reason;
+      if (reason === "locked") { msg = "Muitas tentativas. Aguarde um instante e tente de novo."; field = null; }
+      else if (reason === "server") { msg = "Servidor indisponível. Tente novamente."; field = null; }
+      else if (reason === "invalid") { msg = "O servidor respondeu de forma inesperada. Tente novamente."; field = null; }
+      else if (reason === "offline") { msg = "Não foi possível falar com o servidor. Verifique a conexão."; field = null; }
+      setErr(msg, field);
+      if (field) passEl.focus(); else passEl.blur();
     });
   });
 

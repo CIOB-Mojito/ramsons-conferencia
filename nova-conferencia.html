@@ -10,6 +10,24 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Nova Conferência · RAMSONS</title>
 <link rel="stylesheet" href="rconf-ui.css">
+<style>
+  /* Transição suave e discreta entre os estados da MESMA tarjeta Excel */
+  .card-state.is-in { animation: rconfCardIn .26s ease both; }
+  @keyframes rconfCardIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  /* Spinner pequeno exibido dentro do botão enquanto processa */
+  .btn-spinner {
+    width: 16px; height: 16px; flex: 0 0 16px; border-radius: 50%;
+    border: 2px solid rgba(26,13,2,.30); border-top-color: #1a0d02;
+    animation: rconfSpin .7s linear infinite;
+  }
+  @keyframes rconfSpin { to { transform: rotate(360deg); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card-state.is-in { animation: none; }
+    .btn-spinner { animation-duration: 1.8s; }
+  }
+</style>
 </head>
 <body>
 
@@ -31,6 +49,68 @@
       <h3 class="screen-title"><span class="bar" aria-hidden="true"></span> Nova Conferência</h3>
       <p class="intro">Monte sua conferência em andamento. Você pode ter várias ao mesmo tempo — cada uma retomada por separado.</p>
 
+      <!-- ===== Tarjeta Excel: seleção, resumo e erro na MESMA tarjeta =====
+           Ao escolher um arquivo, a seleção vira o resumo (ou o erro) dentro
+           desta mesma tarjeta, com uma transição suave — nunca há uma segunda. -->
+      <section id="viewPick" class="card" hidden>
+        <!-- estado: seleção de arquivo -->
+        <div class="card-state" id="statePick">
+          <p class="card-label"><span class="dot" aria-hidden="true"></span> Arquivo Excel</p>
+          <button type="button" class="btn btn-primary" id="pickExcel" style="margin-top:14px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+            Selecionar Excel
+          </button>
+          <p class="card-hint">Aceita arquivos .xlsx e .xls — a leitura funciona sem internet.</p>
+
+          <p class="card-label" style="margin-top:20px;">O arquivo Excel deve conter as seguintes informações:</p>
+          <ul class="divlist" style="border:0;">
+            <li class="div" style="border-color:var(--panel-brd);background:var(--panel-2);">
+              <div class="dcode" style="color:var(--accent-2);">CÓDIGO</div>
+              <div class="ddesc" style="font-weight:500;color:var(--txt-dim);font-size:13px;">identificação do item</div>
+            </li>
+            <li class="div" style="border-color:var(--panel-brd);background:var(--panel-2);">
+              <div class="dcode" style="color:var(--accent-2);">DESCRIÇÃO</div>
+              <div class="ddesc" style="font-weight:500;color:var(--txt-dim);font-size:13px;">nome do produto</div>
+            </li>
+            <li class="div" style="border-color:var(--panel-brd);background:var(--panel-2);">
+              <div class="dcode" style="color:var(--accent-2);">QUANTIDADE</div>
+              <div class="ddesc" style="font-weight:500;color:var(--txt-dim);font-size:13px;">unidades a conferir</div>
+            </li>
+          </ul>
+          <p class="card-hint">Essas informações serão utilizadas para conferir cada produto e sua quantidade.</p>
+        </div>
+
+        <!-- estado: resumo do arquivo carregado -->
+        <div class="card-state" id="stateSummary" hidden>
+          <p class="card-label ok"><span class="dot" aria-hidden="true"></span> Arquivo carregado</p>
+          <p id="sumFile" style="margin-top:12px;font-size:15px;font-weight:800;letter-spacing:.2px;word-break:break-all;"></p>
+          <div class="stats">
+            <div class="stat accent"><div class="k">Produtos</div><div class="v" id="sumProd">0</div></div>
+            <div class="stat cyan"><div class="k">Unidades</div><div class="v" id="sumUni">0</div></div>
+            <div class="stat"><div class="k">Códigos</div><div class="v" id="sumCod">0</div></div>
+          </div>
+          <p class="card-label" style="margin-top:16px;">Prévia dos produtos</p>
+          <div id="prodPreview" class="divlist" style="max-height: 280px; overflow-y: auto; -webkit-overflow-scrolling: touch; border: 0;" aria-label="Prévia dos produtos importados"></div>
+          <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px;">
+            <button type="button" class="btn btn-primary" id="continueConf">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+              Continuar para Conferência
+            </button>
+            <button type="button" class="btn btn-ghost" id="loadOther">Carregar outro arquivo</button>
+          </div>
+        </div>
+
+        <!-- estado: erro (mesma tarjeta, permite tentar de novo) -->
+        <div class="card-state" id="stateError" hidden>
+          <p class="card-label warn"><span class="dot" aria-hidden="true"></span> Não foi possível continuar</p>
+          <p id="errMsg" style="margin-top:12px;font-size:14px;line-height:1.5;color:#ffc2c8;"></p>
+          <div id="errList" class="divlist" hidden></div>
+          <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px;">
+            <button type="button" class="btn btn-primary" id="errRetry">Selecionar outro arquivo</button>
+          </div>
+        </div>
+      </section>
+
       <!-- ===== Retomada: já existem conferências em andamento ===== -->
       <section id="viewResume" class="card" hidden>
         <p class="card-label" id="resumeLabel"><span class="dot" aria-hidden="true"></span> Conferência em andamento</p>
@@ -44,61 +124,6 @@
           <button type="button" class="btn btn-ghost" id="resumeNew" style="flex:1;">Iniciar nova</button>
         </div>
         <div id="resumeOutras" style="display:none;flex-direction:column;gap:10px;margin-top:18px;"></div>
-      </section>
-
-      <!-- ===== Seleção de arquivo ===== -->
-      <section id="viewPick" class="card" hidden>
-        <p class="card-label"><span class="dot" aria-hidden="true"></span> Arquivo Excel</p>
-        <button type="button" class="btn btn-primary" id="pickExcel" style="margin-top:14px;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
-          Selecionar Excel
-        </button>
-        <p class="card-hint">Aceita arquivos .xlsx e .xls — a leitura funciona sem internet.</p>
-
-        <p class="card-label" style="margin-top:20px;">O arquivo Excel deve conter as seguintes informações:</p>
-        <ul class="divlist" style="border:0;">
-          <li class="div" style="border-color:var(--panel-brd);background:var(--panel-2);">
-            <div class="dcode" style="color:var(--accent-2);">CÓDIGO</div>
-            <div class="ddesc" style="font-weight:500;color:var(--txt-dim);font-size:13px;">identificação do item</div>
-          </li>
-          <li class="div" style="border-color:var(--panel-brd);background:var(--panel-2);">
-            <div class="dcode" style="color:var(--accent-2);">DESCRIÇÃO</div>
-            <div class="ddesc" style="font-weight:500;color:var(--txt-dim);font-size:13px;">nome do produto</div>
-          </li>
-          <li class="div" style="border-color:var(--panel-brd);background:var(--panel-2);">
-            <div class="dcode" style="color:var(--accent-2);">QUANTIDADE</div>
-            <div class="ddesc" style="font-weight:500;color:var(--txt-dim);font-size:13px;">unidades a conferir</div>
-          </li>
-        </ul>
-        <p class="card-hint">Essas informações serão utilizadas para conferir cada produto e sua quantidade.</p>
-      </section>
-
-      <!-- ===== Resumo do arquivo carregado ===== -->
-      <section id="viewSummary" class="card" hidden>
-        <p class="card-label ok"><span class="dot" aria-hidden="true"></span> Arquivo carregado</p>
-        <p id="sumFile" style="margin-top:12px;font-size:15px;font-weight:800;letter-spacing:.2px;word-break:break-all;"></p>
-        <div class="stats">
-          <div class="stat accent"><div class="k">Produtos</div><div class="v" id="sumProd">0</div></div>
-          <div class="stat cyan"><div class="k">Unidades</div><div class="v" id="sumUni">0</div></div>
-          <div class="stat"><div class="k">Códigos</div><div class="v" id="sumCod">0</div></div>
-        </div>
-        <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px;">
-          <button type="button" class="btn btn-primary" id="continueConf">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-            Continuar para Conferência
-          </button>
-          <button type="button" class="btn btn-ghost" id="loadOther">Carregar outro arquivo</button>
-        </div>
-      </section>
-
-      <!-- ===== Error ===== -->
-      <section id="viewError" class="card" hidden>
-        <p class="card-label warn"><span class="dot" aria-hidden="true"></span> Não foi possível continuar</p>
-        <p id="errMsg" style="margin-top:12px;font-size:14px;line-height:1.5;color:#ffc2c8;"></p>
-        <div id="errList" class="divlist" hidden></div>
-        <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px;">
-          <button type="button" class="btn btn-primary" id="errRetry">Selecionar outro arquivo</button>
-        </div>
       </section>
     </div>
   </div>
@@ -128,9 +153,33 @@
   var $ = function (id) { return document.getElementById(id); };
   var toastEl = $("toast"), loaderEl = $("loader");
 
-  var views = { resume: $("viewResume"), pick: $("viewPick"), summary: $("viewSummary"), error: $("viewError") };
+  /* A tarjeta Excel (viewPick) contém três estados internos — seleção,
+     resumo e erro — e nunca é duplicada: o resumo SUBSTITUI a seleção. */
+  var viewResume = $("viewResume");
+  var cardEl = $("viewPick");
+  var states = { pick: $("statePick"), summary: $("stateSummary"), error: $("stateError") };
+  var currentState = "pick";
+  function setState(name) {
+    if (!states[name]) name = "pick";
+    currentState = name;
+    for (var k in states) if (states[k]) states[k].hidden = (k !== name);
+    var target = states[name];
+    if (target) {                                  // transição suave do estado
+      target.classList.remove("is-in");
+      void target.offsetWidth;                     // reflow: reinicia a animação
+      target.classList.add("is-in");
+    }
+  }
   function show(name) {
-    for (var k in views) if (views[k]) views[k].hidden = (k === "pick") ? false : (k !== name);
+    if (name === "resume") {                       // retomada: card acima + seleção
+      viewResume.hidden = false;
+      cardEl.hidden = false;
+      setState("pick");
+      return;
+    }
+    viewResume.hidden = true;
+    cardEl.hidden = false;
+    setState(name);
   }
 
   var toastTimer;
@@ -143,45 +192,97 @@
     toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 2200);
   }
 
+  /* Estado ocupado do botão: spinner + “Preparando...” e desabilitado. */
+  function setBusy(btn, on) {
+    if (!btn) return;
+    if (on) {
+      if (btn.__rconfBusy) return;
+      btn.__rconfBusy = true;
+      btn.__rconfLabel = btn.innerHTML;
+      btn.disabled = true;
+      btn.setAttribute("aria-busy", "true");
+      btn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span>Preparando...';
+    } else {
+      if (!btn.__rconfBusy) return;
+      btn.__rconfBusy = false;
+      btn.disabled = false;
+      btn.removeAttribute("aria-busy");
+      if (typeof btn.__rconfLabel === "string") btn.innerHTML = btn.__rconfLabel;
+    }
+  }
+
   /* ---------- seleção de arquivo ---------- */
   var input = $("fileInput");
-  function abrirSeletor() { input.value = ""; input.click(); }
-  $("pickExcel").addEventListener("click", abrirSeletor);
-  $("loadOther").addEventListener("click", abrirSeletor);
-  $("errRetry").addEventListener("click", abrirSeletor);
+  var pickBtn = null;   // botão que abriu o seletor e está no estado ocupado
+  function abrirSeletor(btn) {
+    if (pickBtn) return;                       // já há um seletor em andamento
+    pickBtn = btn || null;
+    if (pickBtn && pickBtn.querySelectorAll) { // o "ripple" do toque não deve voltar ao restaurar
+      Array.prototype.forEach.call(pickBtn.querySelectorAll(".ripple"), function (r) { r.remove(); });
+    }
+    setBusy(pickBtn, true);                    // indicador imediato no 1º toque
+    input.value = "";
+    input.click();
+  }
+  function fecharSeletor() {                   // restaura texto, ícone e estado
+    if (!pickBtn) return;
+    setBusy(pickBtn, false);
+    pickBtn = null;
+  }
+  $("pickExcel").addEventListener("click", function () { abrirSeletor(this); });
+  $("loadOther").addEventListener("click", function () { abrirSeletor(this); });
+  $("errRetry").addEventListener("click", function () { abrirSeletor(this); });
+  input.addEventListener("cancel", fecharSeletor);   // usuário fechou sem escolher
 
   $("back").addEventListener("click", function () { window.location.href = "home.html"; });
 
   /* ---------- continuar (cria a conferência persistente) ---------- */
   var ultimo = null;   // resultado do parse atual (prévia)
+
+  /* Garante que o navegador PINTA o estado ocupado antes de iniciar a
+     operação que leva à navegação. Sem isto, uma resposta rápida do servidor
+     (ex.: ~15 ms em rede local) dispara window.location antes do primeiro
+     frame e o spinner nunca chega a ser pintado. Não é atraso artificial:
+     é sincronizar com o frame de renderização (2 rAF = 1 paint garantido). */
+  function aposPintar(fn) {
+    if (typeof requestAnimationFrame !== "function") { fn(); return; }
+    requestAnimationFrame(function () { requestAnimationFrame(fn); });
+  }
+  function irParaConferencia(novo) {
+    window.location.href = "conferencia.html" + (novo && novo.id ? "?id=" + encodeURIComponent(novo.id) : "");
+  }
+
   $("continueConf").addEventListener("click", function () {
     if (!ultimo || !ultimo.ok) { showToast("Selecione um arquivo válido.", "err"); return; }
-    var info = { arquivo: ultimo.arquivo, produtos: ultimo.produtos };
     var btn = this;
-    if (window.RconfApi) {                       // servidor é a fonte principal
-      btn.disabled = true;
-      RconfApi.confStart(info).then(function (d) {
-        var novo = d && d.conferencia;
-        try { Rconf.conf.start(user, info); } catch (e) {}
-        window.location.href = "conferencia.html" + (novo && novo.id ? "?id=" + encodeURIComponent(novo.id) : "");
-      }).catch(function () {                     // fallback local se a API cair
-        btn.disabled = false;
-        var novo = Rconf.conf.start(user, info);
-        window.location.href = "conferencia.html" + (novo && novo.id ? "?id=" + encodeURIComponent(novo.id) : "");
-      });
-      return;
-    }
-    var novo = Rconf.conf.start(user, info);
-    window.location.href = "conferencia.html" + (novo && novo.id ? "?id=" + encodeURIComponent(novo.id) : "");
+    if (btn.disabled) return;                    // ignora cliques repetidos
+    var info = { arquivo: ultimo.arquivo, produtos: ultimo.produtos };
+    setBusy(btn, true);                          // indicador imediato, no 1º toque
+    aposPintar(function () {                     // só então inicia a operação
+      if (window.RconfApi) {                     // servidor é a fonte principal
+        RconfApi.confStart(info).then(function (d) {
+          var novo = d && d.conferencia;
+          // espelha a MESMA conferência do servidor (mesmo id): evita cópia
+          // local duplicada que reaparecia como "em andamento" após finalizar
+          try { Rconf.conf.save(user, novo); } catch (e) {}
+          irParaConferencia(novo);
+        }).catch(function () {                   // fallback local se a API cair
+          setBusy(btn, false);
+          irParaConferencia(Rconf.conf.start(user, info));
+        });
+        return;
+      }
+      irParaConferencia(Rconf.conf.start(user, info));
+    });
   });
 
   input.addEventListener("change", function () {
     var f = input.files && input.files[0];
-    if (!f) return;
+    if (!f) { fecharSeletor(); return; }
     var nome = f.name || "arquivo.xlsx";
-    if (!/\.xlsx?$/i.test(nome)) { mostrarErro("Formato não aceito. Use um arquivo .xlsx ou .xls.", []); return; }
+    if (!/\.xlsx?$/i.test(nome)) { mostrarErro("Formato não aceito. Use um arquivo .xlsx ou .xls.", []); fecharSeletor(); return; }
     var reader = new FileReader();
-    reader.onerror = function () { mostrarErro("Não foi possível ler o arquivo.", []); };
+    reader.onerror = function () { mostrarErro("Não foi possível ler o arquivo.", []); fecharSeletor(); };
     reader.onload = function () {
       var res;
       try { res = RconfExcel.parseArrayBuffer(reader.result, XLSX); }
@@ -194,10 +295,12 @@
         } else {
           mostrarErro(res.erro || "Não foi possível ler a planilha.", []);
         }
+        fecharSeletor();
         return;
       }
       ultimo = { ok: true, arquivo: nome, produtos: res.produtos };
       mostrarResumo(nome, res);
+      fecharSeletor();
     };
     reader.readAsArrayBuffer(f);
   });
@@ -209,8 +312,39 @@
     $("sumProd").textContent = RconfFlow.formatInt(res.produtos.length);
     $("sumUni").textContent = RconfFlow.formatInt(res.totalEsperado);
     $("sumCod").textContent = RconfFlow.formatInt(res.codigos);
+    renderProdPreview(res.produtos || []);
     show("summary");
     showToast("Arquivo carregado com sucesso.", "ok");
+  }
+
+  function renderProdPreview(produtos) {
+    var list = $("prodPreview");
+    if (!list) return;
+    list.innerHTML = "";
+    if (!produtos || !produtos.length) {
+      var empty = document.createElement("p");
+      empty.style.cssText = "font-size:12.5px;color:var(--txt-dim);margin:6px 6px 10px 6px;";
+      empty.textContent = "Nenhum produto encontrado.";
+      list.appendChild(empty);
+      return;
+    }
+    var limit = Math.min(produtos.length, 500);
+    for (var i = 0; i < limit; i++) {
+      var p = produtos[i] || {};
+      var codigo = p.codigo != null ? p.codigo : p.CODIGO != null ? p.CODIGO : p.code != null ? p.code : "";
+      var descricao = p.descricao != null ? p.descricao : p.DESCRICAO != null ? p.DESCRICAO : p.nome != null ? p.nome : p.description != null ? p.description : "";
+      var qtd = p.qtd != null ? p.qtd : p.quantidade != null ? p.quantidade : p.QTD != null ? p.QTD : p.QUANTIDADE != null ? p.QUANTIDADE : "";
+      var li = document.createElement("li");
+      li.className = "div";
+      li.innerHTML = '<div class="dcode">' + escapar(String(codigo)) + '</div><div class="ddesc" style="font-size:12.5px;line-height:1.4;color:var(--txt-dim);">' + escapar(String(descricao)) + '</div><div class="dqty">' + escapar(String(qtd)) + '</div>';
+      list.appendChild(li);
+    }
+    if (produtos.length > limit) {
+      var more = document.createElement("p");
+      more.style.cssText = "font-size:12px;color:var(--txt-dim);text-align:center;margin:4px 4px 8px 4px;";
+      more.textContent = "e mais " + (produtos.length - limit) + " produtos...";
+      list.appendChild(more);
+    }
   }
 
   function mostrarErro(msg, duplicados) {

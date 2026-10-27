@@ -543,9 +543,12 @@ function saveOpenConfs(user, list) {
   if (!isKnown(user)) return false;
   const dir = userDir(user);
   if (!dir) return false;
+  // A lista é a fonte de verdade; o espelho só é atualizado se a lista foi
+  // gravada (evita um espelho "fantasma" divergente do estado real).
   const ok = writeJSON(path.join(dir, "conferencias.json"), list);
+  if (!ok) return false;
   writeJSON(path.join(dir, "conferenciaAtual.json"), list.length ? list[0] : null);
-  return ok;
+  return true;
 }
 
 function listOpenConfs(user) {
@@ -649,23 +652,43 @@ function clearConf(user, id) {
 }
 
 function finishConf(user, id) {
-  if (!isKnown(user)) return null;
+  if (!isKnown(user)) return { ok: false, code: "not_found" };
   const target = targetConf(user, id);
-  if (!target) return null;
+  if (!target) return { ok: false, code: "not_found" };
   const now = Date.now();
   target.finalizadaEm = now;
   target.atualizadaEm = now;
   const hist = listHist(user);
   if (!hist.some((h) => h && h.id === target.id)) hist.push(target);  // nunca duplica
-  writeJSON(fileFor(user, "historico.json"), hist);
-  saveOpenConfs(user, listOpenConfs(user).filter((c) => c.id !== target.id));
-  return target;
+  // NUNCA remove a conferência aberta se o histórico não puder ser gravado:
+  // caso contrário a conferência sumiria das abertas sem nunca constar no
+  // histórico (perda silenciosa de dados).
+  if (!writeJSON(fileFor(user, "historico.json"), hist)) {
+    return { ok: false, code: "storage", message: "Não foi possível salvar o histórico" };
+  }
+  const rest = listOpenConfs(user).filter((c) => c.id !== target.id);
+  if (!saveOpenConfs(user, rest)) {
+    // desfaz o histórico recém-gravado para não deixar a conferência
+    // DUPLICADA (aberta + no histórico) de forma silenciosa (melhor esforço).
+    writeJSON(fileFor(user, "historico.json"), hist.filter((h) => !(h && h.id === target.id)));
+    return { ok: false, code: "storage", message: "Não foi possível atualizar as conferências abertas" };
+  }
+  return { ok: true, conferencia: target };
 }
 
 function listHist(user) {
   if (!isKnown(user)) return [];
   const h = readJSON(fileFor(user, "historico.json"), []);
-  return Array.isArray(h) ? h : [];
+  if (!Array.isArray(h)) return [];
+  // lê sem duplicados (defensivo, não apaga nada do disco)
+  const seen = {};
+  const out = [];
+  for (const c of h) {
+    if (!c || typeof c !== "object" || !c.id || seen[c.id]) continue;
+    seen[c.id] = true;
+    out.push(c);
+  }
+  return out;
 }
 
 function getHist(user, id) {

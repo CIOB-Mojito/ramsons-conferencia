@@ -16,7 +16,11 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: "/ws" });
 
 app.disable("x-powered-by");
-app.use(express.json());
+/* Limite do corpo JSON ampliado para importar planilhas grandes (o store
+   aceita até 10.000 produtos por conferência). Ajustável por variável de
+   ambiente para testes/operação: RCONF_JSON_LIMIT (ex.: "8mb"). */
+const JSON_LIMIT = process.env.RCONF_JSON_LIMIT || "8mb";
+app.use(express.json({ limit: JSON_LIMIT }));
 
 function lanAddresses() {
   const out = [];
@@ -38,15 +42,12 @@ function clientsCount() {
 }
 
 app.get("/api/status", (req, res) => {
+  /* Não expõe rede/cliente/porta: apenas o essencial para o painel. */
   res.json({
     ok: true,
     app: APP,
     server: "local",
-    port: PORT,
-    clients: clientsCount(),
     uptimeSec: Math.round((Date.now() - STARTED_AT) / 1000),
-    network: lanAddresses(),
-    websocket: { path: "/ws", connected: clientsCount() },
     time: new Date().toISOString()
   });
 });
@@ -119,13 +120,99 @@ function clearSessionCookie(res) {
   res.setHeader("Set-Cookie", COOKIE + "=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
 }
 
+/* =====================================================================
+   LIMITE DE TENTATIVAS DE LOGIN (anti força-bruta)
+   Conta falhas por (IP + usuário) e por IP. Todo bloqueio EXPIRA, então um
+   atacante não consegue bloquear indefinidamente um usuário de outro lugar.
+   Estado em memória (sem arquivos); reiniciar o servidor zera os contadores.
+   Limites ajustáveis por variável de ambiente (testes/operação).
+   ===================================================================== */
+function envNum(name, fallback) {
+  const v = Number(process.env[name]);
+  return Number.isFinite(v) && v >= 0 ? v : fallback;
+}
+const LOGIN_WINDOW_MS = envNum("RCONF_LOGIN_WINDOW_MS", 15 * 60 * 1000);
+const LOGIN_MAX_ID = envNum("RCONF_LOGIN_MAX", 5);
+const LOGIN_MAX_IP = envNum("RCONF_LOGIN_MAX_IP", 20);
+const LOGIN_BLOCK_MS = envNum("RCONF_LOGIN_BLOCK_MS", 5 * 60 * 1000);
+const LOGIN_BLOCK_MAX_MS = envNum("RCONF_LOGIN_BLOCK_MAX_MS", 30 * 60 * 1000);
+const LOGIN_MAX_ENTRIES = 5000;
+
+const loginFails = new Map();
+
+function clientIp(req) {
+  const a = (req.socket && req.socket.remoteAddress) || "";
+  return String(a).replace(/^::ffff:/, "") || "?";
+}
+function loginKey(ip, user) {
+  return ip + "|" + String(user == null ? "" : user).toLowerCase();
+}
+function pruneLoginFails(now) {
+  for (const [k, e] of loginFails) {
+    const expired = (e.blockedUntil && e.blockedUntil <= now) ||
+      (!e.blockedUntil && now - e.windowStart > LOGIN_WINDOW_MS);
+    if (expired) loginFails.delete(k);
+  }
+}
+function loginEntry(key, now) {
+  let e = loginFails.get(key);
+  if (!e) {
+    if (loginFails.size >= LOGIN_MAX_ENTRIES) pruneLoginFails(now);
+    e = { count: 0, windowStart: now, blockedUntil: 0, strikes: 0 };
+    loginFails.set(key, e);
+    return e;
+  }
+  if (e.blockedUntil && e.blockedUntil <= now) {
+    e.blockedUntil = 0; e.count = 0; e.strikes = 0; e.windowStart = now;
+  } else if (!e.blockedUntil && now - e.windowStart > LOGIN_WINDOW_MS) {
+    e.count = 0; e.windowStart = now;
+  }
+  return e;
+}
+function loginBlockedUntil(ip, user, now) {
+  const a = loginEntry(loginKey(ip, user), now);
+  const b = loginEntry("ip|" + ip, now);
+  return Math.max(a.blockedUntil || 0, b.blockedUntil || 0);
+}
+function loginFail(ip, user, now) {
+  const bump = (key, max) => {
+    const e = loginEntry(key, now);
+    e.count++;
+    if (e.count >= max) {
+      e.strikes++;
+      e.blockedUntil = now + Math.min(LOGIN_BLOCK_MAX_MS, LOGIN_BLOCK_MS * Math.pow(2, e.strikes - 1));
+      e.count = 0;
+    }
+  };
+  bump(loginKey(ip, user), LOGIN_MAX_ID);
+  bump("ip|" + ip, LOGIN_MAX_IP);
+}
+function loginReset(ip, user) {
+  loginFails.delete(loginKey(ip, user));
+}
+
 app.post("/api/login", (req, res) => {
   const b = req.body || {};
   const user = String(b.usuario != null ? b.usuario : (b.user != null ? b.user : ""));
   const pin = String(b.pin != null ? b.pin : "");
+  const ip = clientIp(req);
+
+  const now = Date.now();
+  const until = loginBlockedUntil(ip, user, now);
+  if (until > now) {
+    res.set("Retry-After", String(Math.ceil((until - now) / 1000)));
+    return res.status(429).json({
+      ok: false,
+      error: "too_many_attempts",
+      message: "Muitas tentativas de login. Tente novamente mais tarde."
+    });
+  }
+
   if (!store.auth(user, pin)) {
+    loginFail(ip, user, now);
     return res.status(401).json({ ok: false, error: "invalid_credentials" });
   }
+  loginReset(ip, user);
   const s = store.createSession(user);
   const acc = store.accountOf(user) || {};
   setSessionCookie(res, s.token);
@@ -312,9 +399,15 @@ app.put("/api/conferencia/produto", requireUser, (req, res) => {
 
 app.post("/api/conferencia/finalizar", requireUser, (req, res) => {
   const b = req.body || {};
-  const conf = store.finishConf(req.rconfUser, b.id);
-  if (!conf) return res.status(404).json({ ok: false, error: "no_conference" });
-  res.json({ ok: true, conferencia: conf });
+  const r = store.finishConf(req.rconfUser, b.id);
+  if (!r || r.ok !== true) {
+    const code = r ? r.code : "invalid";
+    if (code === "not_found") return res.status(404).json({ ok: false, error: "no_conference" });
+    // falha de armazenamento: a conferência CONTINUA aberta (nada foi perdido)
+    const status = code === "storage" ? 500 : 400;
+    return res.status(status).json({ ok: false, error: code, message: r ? r.message : "Não foi possível finalizar a conferência" });
+  }
+  res.json({ ok: true, conferencia: r.conferencia });
 });
 
 app.delete("/api/conferencias/:id", requireUser, (req, res) => {

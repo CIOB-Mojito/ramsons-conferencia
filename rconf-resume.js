@@ -29,7 +29,13 @@
 
   function paint(conf, target) {
     if (!conf || !conf.produtos || !conf.produtos.length) return;
-    target = target || "conferencia.html";
+    if (!target) {
+      if (conf.id) {
+        target = "conferencia.html?id=" + encodeURIComponent(conf.id);
+      } else {
+        target = "conferencia.html";
+      }
+    }
     var feitos = 0;
     for (var i = 0; i < conf.produtos.length; i++) if (conf.produtos[i].status === "conferido") feitos++;
     var total = conf.produtos.length;
@@ -77,7 +83,7 @@
       var open = (d && d.conferencias) || [];
       if (open.length === 1) {
         mirror(open[0]);
-        paint(open[0], "conferencia.html?id=" + encodeURIComponent(open[0].id));
+        paint(open[0]);
         return;
       }
       if (open.length > 1) {
@@ -85,9 +91,9 @@
         return;
       }
       // Sem conferência no servidor: NUNCA enviar automaticamente a cópia
-      // local. Se existir cópia local da MESMA conta, leva a "Nova
-      // Conferência", onde a recuperação é explícita (botão "Continuar").
-      if (localConf) paint(localConf, "nova-conferencia.html");
+      // local. Se existir cópia local da MESMA conta, abre a própria
+      // conferência (com ID real), nunca redirecionando para nova-conferencia.
+      if (localConf) paint(localConf);
     }).catch(function () { paint(localConf); });
   } else {
     var locais = (R.confs && R.confs.list) ? R.confs.list(u) : [];

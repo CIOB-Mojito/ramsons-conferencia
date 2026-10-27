@@ -53,6 +53,26 @@
     });
   }
 
+  /* aplica alterações pendentes (não sincronizadas) sobre a lista de produtos:
+     devolve nova lista, sem alterar a original. pendentes: [{codigo, conferido}] */
+  function applyPending(produtos, pendentes) {
+    var list = produtos || [];
+    var pends = pendentes || [];
+    if (!pends.length) return list.slice();
+    return list.map(function (p) {
+      for (var i = 0; i < pends.length; i++) {
+        var it = pends[i];
+        if (it && String(p.codigo) === String(it.codigo)) {
+          if (pends[i].conferido === null || pendentes[i].conferido === undefined) {
+            return { codigo: p.codigo, descricao: p.descricao, esperado: p.esperado, conferido: null, status: "pendente" };
+          }
+          return { codigo: p.codigo, descricao: p.descricao, esperado: p.esperado, conferido: Number(pends[i].conferido) || 0, status: "conferido" };
+        }
+      }
+      return p;
+    });
+  }
+
   function clampQty(n) {
     n = Number(n);
     if (!isFinite(n) || n < 0) return 0;
@@ -99,7 +119,7 @@
 
   var api = {
     norm: norm, matches: matches, filterList: filterList, progress: progress,
-    setProduto: setProduto, clampQty: clampQty, formatInt: formatInt,
+    setProduto: setProduto, applyPending: applyPending, clampQty: clampQty, formatInt: formatInt,
     resumo: resumo, resumoTexto: resumoTexto, dataCurta: dataCurta
   };
   root.RconfFlow = api;

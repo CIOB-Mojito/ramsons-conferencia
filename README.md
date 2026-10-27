@@ -20,7 +20,11 @@ abertas** por usuário, **histórico**, **contas com perfis (ADM/USUARIO)** e fu
   usuários, além de **carregar uma conferência para outro usuário**.
 - **Alteração do próprio PIN** pelo usuário.
 - **Armazenamento local** persistido em disco (pasta `data/`), sem banco de dados externo.
-- **Tempo real** via WebSocket (`/ws`) para atualizações de estado.
+- **Canal WebSocket** (`/ws`) disponível no servidor (mensagens `ping`/`echo`/`broadcast`).
+  > **Observação:** esse canal **não está integrado ao estado da interface**. A aplicação
+  > **não** sincroniza dados em tempo real via WebSocket; as telas obtêm e enviam dados pela
+  > API REST e pelo armazenamento local. O WebSocket serve apenas como canal genérico de
+  > presença/eco, sem reflexo automático na UI.
 
 ---
 
@@ -119,7 +123,7 @@ ramsons-conferencia/
 ├── rconf-flow.js           # Regras de cálculo da conferência
 ├── rconf-excel.js          # Importação de planilhas (SheetJS)
 ├── rconf-api.js            # Cliente HTTP da API
-├── rconf-resume.js         # Lógica da tela de resumo
+├── rconf-resume.js         # Retomada da conferência em andamento (painel inicial)
 ├── rconf-ui.css            # Estilos
 ├── index.html              # Login
 ├── home.html               # Painel inicial / lista de conferências
@@ -132,6 +136,7 @@ ramsons-conferencia/
 ├── usuarios.html           # Lista de usuários (ADM)
 ├── usuario.html            # Detalhe/gestão de usuário + carregar conferência (ADM)
 ├── vendor/                 # Bibliotecas locais (SheetJS, three.js)
+├── public/                 # Pasta estática opcional (atualmente vazia)
 ├── package.json
 └── data/                   # (NÃO versionado) dados locais gerados em tempo de execução
 ```
